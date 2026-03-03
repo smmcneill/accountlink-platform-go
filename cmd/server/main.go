@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"accountlink-platform-go/internal/api"
 	"accountlink-platform-go/internal/app"
@@ -16,25 +14,30 @@ import (
 	"accountlink-platform-go/internal/db"
 	"accountlink-platform-go/internal/domain"
 	"accountlink-platform-go/internal/events"
-	"accountlink-platform-go/internal/middleware"
 	"accountlink-platform-go/internal/persistence"
+	"accountlink-platform-go/internal/server"
 
 	awsv2 "github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
-	"github.com/go-chi/chi/v5"
-	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
+	if err := run(); err != nil {
+		logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+		logger.Error("server exited with error", "err", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	cfg, err := config.Load()
 	if err != nil {
-		logger.Error("config load failed", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("config load failed: %w", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -42,15 +45,13 @@ func main() {
 
 	pool, err := pgxpool.New(ctx, cfg.DBDSN)
 	if err != nil {
-		logger.Error("db connect failed", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("db connect failed: %w", err)
 	}
 
 	defer pool.Close()
 
 	if err := db.Migrate(ctx, pool); err != nil {
-		logger.Error("db migration failed", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("db migration failed: %w", err)
 	}
 
 	txManager := persistence.NewTxManager(pool)
@@ -64,40 +65,16 @@ func main() {
 
 	publisher, err := buildPublisher(ctx, cfg, logger)
 	if err != nil {
-		logger.Error("event publisher setup failed", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("event publisher setup failed: %w", err)
 	}
 
 	processor := app.NewOutboxProcessor(txManager, outbox, publisher, clock, cfg.OutboxPollBatch, cfg.OutboxPollDelay, logger)
 	go processor.Start(ctx)
 
-	h := api.NewHandler(svc)
-	r := chi.NewRouter()
-	r.Use(chimw.Recoverer)
-	r.Use(middleware.Logging(logger))
-	r.Mount("/", h.Routes())
+	apiHandler := api.NewHandler(svc)
+	httpServer := server.New(":"+cfg.Port, logger, apiHandler)
 
-	server := &http.Server{
-		Addr:              ":" + cfg.Port,
-		Handler:           r,
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-
-	go func() {
-		logger.Info("server_starting", "addr", server.Addr)
-
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("server failed", "err", err)
-			stop()
-		}
-	}()
-
-	<-ctx.Done()
-
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	_ = server.Shutdown(shutdownCtx)
+	return httpServer.Run(ctx)
 }
 
 func buildPublisher(ctx context.Context, cfg config.Config, logger *slog.Logger) (domain.EventPublisher, error) {

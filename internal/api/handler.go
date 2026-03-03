@@ -13,8 +13,11 @@ import (
 )
 
 type (
+	URLParamFunc func(r *http.Request, key string) string
+
 	Handler struct {
-		service *app.AccountLinkService
+		service  *app.AccountLinkService
+		urlParam URLParamFunc
 	}
 
 	createAccountLinkRequest struct {
@@ -30,25 +33,19 @@ type (
 )
 
 func NewHandler(service *app.AccountLinkService) *Handler {
-	return &Handler{service: service}
+	return &Handler{
+		service:  service,
+		urlParam: chi.URLParam,
+	}
 }
 
-func (h *Handler) Routes() http.Handler {
-	r := chi.NewRouter()
-	r.Get("/_health", h.health)
-	r.Get("/account-links/{id}", h.getAccountLink)
-	r.Post("/account-links", h.createAccountLink)
-
-	return r
-}
-
-func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	_, _ = w.Write([]byte("ok"))
 }
 
-func (h *Handler) getAccountLink(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(chi.URLParam(r, "id"))
+func (h *Handler) GetAccountLink(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(h.urlParam(r, "id"))
 	if err != nil {
 		writeProblem(w, http.StatusBadRequest, "Bad Request", "Invalid account link id")
 		return
@@ -69,7 +66,7 @@ func (h *Handler) getAccountLink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, link)
 }
 
-func (h *Handler) createAccountLink(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateAccountLink(w http.ResponseWriter, r *http.Request) {
 	var req createAccountLinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeProblem(w, http.StatusBadRequest, "Bad Request", "Malformed JSON")

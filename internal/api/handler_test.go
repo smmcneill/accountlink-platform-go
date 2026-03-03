@@ -13,6 +13,7 @@ import (
 	"accountlink-platform-go/internal/app"
 	"accountlink-platform-go/internal/domain"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -26,12 +27,22 @@ func testService() *app.AccountLinkService {
 	)
 }
 
+func testRouter(h *Handler) http.Handler {
+	r := chi.NewRouter()
+	r.Get("/_health", h.Health)
+	r.Get("/account-links/{id}", h.GetAccountLink)
+	r.Post("/account-links", h.CreateAccountLink)
+
+	return r
+}
+
 func TestHealthReturnsOK(t *testing.T) {
 	h := NewHandler(testService())
+	router := testRouter(h)
 	req := httptest.NewRequest(http.MethodGet, "/_health", nil)
 	w := httptest.NewRecorder()
 
-	h.Routes().ServeHTTP(w, req)
+	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK || w.Body.String() != "ok" {
 		t.Fatalf("expected 200/ok, got %d/%q", w.Code, w.Body.String())
@@ -40,6 +51,7 @@ func TestHealthReturnsOK(t *testing.T) {
 
 func TestCreateReplayReturns200(t *testing.T) {
 	h := NewHandler(testService())
+	router := testRouter(h)
 
 	body := map[string]string{"userId": "user-123", "externalInstitution": "Chase"}
 	raw, _ := json.Marshal(body)
@@ -49,7 +61,7 @@ func TestCreateReplayReturns200(t *testing.T) {
 	req1.Header.Set("Idempotency-Key", "k-123")
 
 	w1 := httptest.NewRecorder()
-	h.Routes().ServeHTTP(w1, req1)
+	router.ServeHTTP(w1, req1)
 
 	if w1.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d", w1.Code)
@@ -60,7 +72,7 @@ func TestCreateReplayReturns200(t *testing.T) {
 	req2.Header.Set("Idempotency-Key", "k-123")
 
 	w2 := httptest.NewRecorder()
-	h.Routes().ServeHTTP(w2, req2)
+	router.ServeHTTP(w2, req2)
 
 	if w2.Code != http.StatusOK {
 		t.Fatalf("expected 200 replay, got %d", w2.Code)
@@ -73,13 +85,14 @@ func TestCreateReplayReturns200(t *testing.T) {
 
 func TestCreateBlankUserIDReturns400(t *testing.T) {
 	h := NewHandler(testService())
+	router := testRouter(h)
 	raw := []byte(`{"userId":"", "externalInstitution":"Chase"}`)
 	req := httptest.NewRequest(http.MethodPost, "/account-links", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
 
-	h.Routes().ServeHTTP(w, req)
+	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
