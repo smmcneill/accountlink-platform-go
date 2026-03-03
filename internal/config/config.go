@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -20,7 +22,13 @@ type (
 
 	envConfig struct {
 		Port              string `envconfig:"PORT" default:"8080"`
-		DBDSN             string `envconfig:"DB_DSN" default:"postgres://accountlink:accountlink@localhost:5444/accountlink?sslmode=disable"`
+		DBDSN             string `envconfig:"DB_DSN"`
+		DBHost            string `envconfig:"DB_HOST" default:"localhost"`
+		DBPort            int    `envconfig:"DB_PORT" default:"5444"`
+		DBUser            string `envconfig:"DB_USER" default:"accountlink"`
+		DBPassword        string `envconfig:"DB_PASSWORD" default:"accountlink"`
+		DBName            string `envconfig:"DB_NAME" default:"accountlink"`
+		DBSSLMode         string `envconfig:"DB_SSL_MODE" default:"disable"`
 		EventTarget       string `envconfig:"EVENT_TARGET" default:"logging"`
 		SNSTopicARN       string `envconfig:"ACCOUNTLINK_SNS_TOPIC_ARN"`
 		SNSEndpoint       string `envconfig:"ACCOUNTLINK_SNS_ENDPOINT"`
@@ -36,9 +44,14 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	dbDSN := parsed.DBDSN
+	if dbDSN == "" {
+		dbDSN = buildPostgresDSN(parsed)
+	}
+
 	return Config{
 		Port:            parsed.Port,
-		DBDSN:           parsed.DBDSN,
+		DBDSN:           dbDSN,
 		EventTarget:     parsed.EventTarget,
 		SNSTopicARN:     parsed.SNSTopicARN,
 		SNSEndpoint:     parsed.SNSEndpoint,
@@ -46,4 +59,19 @@ func Load() (Config, error) {
 		OutboxPollDelay: time.Duration(parsed.OutboxPollDelayMS) * time.Millisecond,
 		OutboxPollBatch: parsed.OutboxPollBatch,
 	}, nil
+}
+
+func buildPostgresDSN(cfg envConfig) string {
+	u := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(cfg.DBUser, cfg.DBPassword),
+		Host:   fmt.Sprintf("%s:%d", cfg.DBHost, cfg.DBPort),
+		Path:   "/" + cfg.DBName,
+	}
+
+	q := u.Query()
+	q.Set("sslmode", cfg.DBSSLMode)
+	u.RawQuery = q.Encode()
+
+	return u.String()
 }

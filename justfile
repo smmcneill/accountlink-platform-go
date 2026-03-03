@@ -5,7 +5,9 @@ run:
     @go run ./cmd/server
 
 fmt:
-    @go fmt ./...
+    @go fmt ./cmd/... ./internal/...
+
+tidy:
     @go mod tidy
 
 setup:
@@ -17,21 +19,29 @@ setup:
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew upgrade
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew install golangci-lint
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew install flyway
-    @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew install aws-cdk
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew install node
 
 lint:
-    @golangci-lint run
+    @golangci-lint run ./cmd/... ./internal/...
 
 lint-fix:
-    @golangci-lint run --fix
+    @golangci-lint run --fix ./cmd/... ./internal/...
 
 test:
     @just fmt
-    @go test ./...
+    @go test ./cmd/... ./internal/...
 
 infra-install:
     @cd infra/cdk && npm install
+
+build-linux-binary platform="linux/amd64":
+    @mkdir -p build
+    @case "{{platform}}" in \
+        linux/amd64) GOARCH=amd64 ;; \
+        linux/arm64) GOARCH=arm64 ;; \
+        *) echo "Unsupported platform '{{platform}}'. Supported: linux/amd64, linux/arm64"; exit 1 ;; \
+    esac; \
+    CGO_ENABLED=0 GOOS=linux GOARCH=$GOARCH go build -trimpath -ldflags="-s -w" -o build/server ./cmd/server
 
 flyway-migrate env:
     @if [ ! -f "infra/flyway/{{env}}.conf" ]; then \
@@ -41,13 +51,15 @@ flyway-migrate env:
     @flyway -configFiles=infra/flyway/{{env}}.conf migrate
 
 cdk-bootstrap env:
-    @cd infra/cdk && npm install && cdk bootstrap -c envName={{env}}
+    @cd infra/cdk && npm install && npx cdk bootstrap -c envName={{env}}
 
 cdk-synth env:
-    @cd infra/cdk && npm install && cdk synth -c envName={{env}}
+    @just build-linux-binary
+    @cd infra/cdk && npm install && npx cdk synth -c envName={{env}}
 
 cdk-deploy env:
-    @cd infra/cdk && npm install && cdk deploy --require-approval never -c envName={{env}}
+    @just build-linux-binary
+    @cd infra/cdk && npm install && npx cdk deploy --require-approval never -c envName={{env}}
 
 release env:
     @just flyway-migrate {{env}}
@@ -59,3 +71,7 @@ db-up:
 docker-clean:
     @docker rm -f $(docker ps -qa)    
     @docker rmi -f $(docker images -qa)
+
+image-build tag="accountlink-platform-go:latest" platform="linux/amd64":
+    @just build-linux-binary platform={{platform}}
+    @docker build --platform {{platform}} -t {{tag}} .

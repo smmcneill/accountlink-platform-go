@@ -1,0 +1,5 @@
+.git
+.gitignore
+infra/cdk/node_modules
+infra/cdk/cdk.out
+**/.DS_Store

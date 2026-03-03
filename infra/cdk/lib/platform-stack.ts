@@ -1,29 +1,24 @@
 import {
   CfnOutput,
   Duration,
+  RemovalPolicy,
   Stack,
   StackProps
 } from "aws-cdk-lib";
-import {
-  Certificate
-} from "aws-cdk-lib/aws-certificatemanager";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import * as logs from "aws-cdk-lib/aws-logs";
-import * as route53 from "aws-cdk-lib/aws-route53";
-import * as targets from "aws-cdk-lib/aws-route53-targets";
+import * as rds from "aws-cdk-lib/aws-rds";
 import { Construct } from "constructs";
 
 export interface PlatformStackProps extends StackProps {
   appName: string;
   envName: string;
-  imageUri: string;
+  imageAssetPath: string;
+  imageAssetDockerfile: string;
   containerPort: number;
   desiredCount: number;
-  hostedZoneDomain: string;
-  recordName: string;
-  certificateArn: string;
   vpcId?: string;
 }
 
@@ -53,8 +48,10 @@ export class PlatformStack extends Stack {
       retention: logs.RetentionDays.ONE_MONTH
     });
 
-    taskDefinition.addContainer("App", {
-      image: ecs.ContainerImage.fromRegistry(props.imageUri),
+    const container = taskDefinition.addContainer("App", {
+      image: ecs.ContainerImage.fromAsset(props.imageAssetPath, {
+        file: props.imageAssetDockerfile
+      }),
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: props.appName,
         logGroup
@@ -71,7 +68,7 @@ export class PlatformStack extends Stack {
       allowAllOutbound: true,
       description: "ALB security group"
     });
-    albSecurityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(443), "Allow HTTPS");
+    albSecurityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), "Allow HTTP");
 
     const serviceSecurityGroup = new ec2.SecurityGroup(this, "ServiceSg", {
       vpc,
@@ -79,6 +76,15 @@ export class PlatformStack extends Stack {
       description: "ECS service security group"
     });
     serviceSecurityGroup.addIngressRule(albSecurityGroup, ec2.Port.tcp(props.containerPort), "Allow ALB to app");
+
+    const dbSecurityGroup = new ec2.SecurityGroup(this, "DbSg", {
+      vpc,
+      allowAllOutbound: true,
+      description: "Aurora PostgreSQL security group"
+    });
+    dbSecurityGroup.addIngressRule(serviceSecurityGroup, ec2.Port.tcp(5432), "Allow ECS service to Postgres");
+
+    const databaseName = "accountlink";
 
     const service = new ecs.FargateService(this, "Service", {
       cluster,
@@ -91,16 +97,46 @@ export class PlatformStack extends Stack {
       }
     });
 
+    const dbCluster = new rds.DatabaseCluster(this, "Database", {
+      engine: rds.DatabaseClusterEngine.auroraPostgres({
+        version: rds.AuroraPostgresEngineVersion.VER_16_11
+      }),
+      writer: rds.ClusterInstance.serverlessV2("writer"),
+      serverlessV2MinCapacity: 0.5,
+      serverlessV2MaxCapacity: 2,
+      defaultDatabaseName: databaseName,
+      credentials: rds.Credentials.fromGeneratedSecret("accountlink"),
+      vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS
+      },
+      securityGroups: [dbSecurityGroup],
+      removalPolicy: RemovalPolicy.DESTROY,
+      deletionProtection: false
+    });
+
+    container.addEnvironment("DB_HOST", dbCluster.clusterEndpoint.hostname);
+    container.addEnvironment("DB_PORT", dbCluster.clusterEndpoint.port.toString());
+    container.addEnvironment("DB_NAME", databaseName);
+    container.addEnvironment("DB_SSL_MODE", "require");
+
+    if (dbCluster.secret) {
+      dbCluster.secret.grantRead(taskDefinition.taskRole);
+      if (taskDefinition.executionRole) {
+        dbCluster.secret.grantRead(taskDefinition.executionRole);
+      }
+      container.addSecret("DB_USER", ecs.Secret.fromSecretsManager(dbCluster.secret, "username"));
+      container.addSecret("DB_PASSWORD", ecs.Secret.fromSecretsManager(dbCluster.secret, "password"));
+    }
+
     const loadBalancer = new elbv2.ApplicationLoadBalancer(this, "Alb", {
       vpc,
       internetFacing: true,
       securityGroup: albSecurityGroup
     });
 
-    const certificate = Certificate.fromCertificateArn(this, "Certificate", props.certificateArn);
-    const listener = loadBalancer.addListener("HttpsListener", {
-      port: 443,
-      certificates: [certificate],
+    const listener = loadBalancer.addListener("HttpListener", {
+      port: 80,
       open: true
     });
 
@@ -116,22 +152,20 @@ export class PlatformStack extends Stack {
       }
     });
 
-    const zone = route53.HostedZone.fromLookup(this, "HostedZone", {
-      domainName: props.hostedZoneDomain
-    });
-
-    new route53.ARecord(this, "AppAlias", {
-      zone,
-      recordName: props.recordName,
-      target: route53.RecordTarget.fromAlias(new targets.LoadBalancerTarget(loadBalancer))
-    });
-
-    const fqdn = props.recordName === "" ? props.hostedZoneDomain : `${props.recordName}.${props.hostedZoneDomain}`;
     new CfnOutput(this, "ServiceUrl", {
-      value: `https://${fqdn}`
+      value: `http://${loadBalancer.loadBalancerDnsName}`
     });
     new CfnOutput(this, "LoadBalancerDnsName", {
       value: loadBalancer.loadBalancerDnsName
+    });
+    new CfnOutput(this, "AuroraEndpoint", {
+      value: dbCluster.clusterEndpoint.hostname
+    });
+    new CfnOutput(this, "AuroraPort", {
+      value: dbCluster.clusterEndpoint.port.toString()
+    });
+    new CfnOutput(this, "AuroraSecretArn", {
+      value: dbCluster.secret?.secretArn ?? ""
     });
   }
 }
