@@ -37,6 +37,8 @@ just image-build platform=linux/arm64
 - `DB_DSN` (default `postgres://accountlink:accountlink@localhost:5444/accountlink?sslmode=disable`)
 - Optional split DB settings when `DB_DSN` is not set:
   `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL_MODE`
+- `DB_STARTUP_MAX_WAIT_MS` (default `300000`)
+- `DB_STARTUP_RETRY_MS` (default `5000`)
 - `EVENT_TARGET` (`logging` default, `sns` optional)
 - `ACCOUNTLINK_SNS_TOPIC_ARN`
 - `ACCOUNTLINK_SNS_ENDPOINT` (for localstack)
@@ -49,7 +51,9 @@ Use the same docker compose as the Java project for Postgres + LocalStack.
 
 ## Cloud Deployment (CDK + Flyway)
 - CDK code lives in `infra/cdk` (TypeScript).
-- Stack targets ECS Fargate + HTTP Application Load Balancer + Aurora PostgreSQL (Serverless v2).
+- Uses two stacks:
+  - foundation stack: VPC + Aurora PostgreSQL (Serverless v2)
+  - service stack: ECS Fargate + HTTP Application Load Balancer
 - Flyway config files should live in `infra/flyway/<env>.conf`.
 - Environment/account config for `dev`, `test`, `prod` lives in `infra/cdk/lib/config/`.
 - Stack outputs include Aurora endpoint/port/secret ARN for wiring DB connectivity and migrations.

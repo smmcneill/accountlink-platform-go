@@ -59,7 +59,7 @@ cdk-synth env:
 
 cdk-deploy env:
     @just build-linux-binary
-    @cd infra/cdk && npm install && npx cdk deploy --require-approval never -c envName={{env}}
+    @cd infra/cdk && npm install && npx cdk deploy --all --require-approval never -c envName={{env}}
 
 release env:
     @just flyway-migrate {{env}}

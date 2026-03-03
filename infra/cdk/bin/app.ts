@@ -5,7 +5,8 @@ import {
   getEnvironmentConfig,
   resolveEnvironmentName
 } from "../lib/config";
-import { PlatformStack } from "../lib/platform-stack";
+import { FoundationStack } from "../lib/foundation-stack";
+import { ServiceStack } from "../lib/service-stack";
 
 function readConfig(app: App): {
   appName: string;
@@ -37,11 +38,28 @@ function readConfig(app: App): {
 
 const app = new App();
 const cfg = readConfig(app);
+const env = {
+  account: cfg.account,
+  region: cfg.region
+};
 
-new PlatformStack(app, `${cfg.appName}-${cfg.envName}`, {
-  env: {
-    account: cfg.account,
-    region: cfg.region
-  },
-  ...cfg
+const foundation = new FoundationStack(app, `${cfg.appName}-${cfg.envName}-foundation`, {
+  env,
+  appName: cfg.appName,
+  envName: cfg.envName,
+  vpcId: cfg.vpcId
+});
+
+new ServiceStack(app, `${cfg.appName}-${cfg.envName}-service`, {
+  env,
+  appName: cfg.appName,
+  envName: cfg.envName,
+  imageAssetPath: cfg.imageAssetPath,
+  imageAssetDockerfile: cfg.imageAssetDockerfile,
+  containerPort: cfg.containerPort,
+  desiredCount: cfg.desiredCount,
+  vpc: foundation.vpc,
+  dbCluster: foundation.dbCluster,
+  dbSecurityGroup: foundation.dbSecurityGroup,
+  databaseName: foundation.databaseName
 });

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"accountlink-platform-go/internal/api"
 	"accountlink-platform-go/internal/app"
@@ -50,7 +51,7 @@ func run() error {
 
 	defer pool.Close()
 
-	if err := db.Migrate(ctx, pool); err != nil {
+	if err := migrateWithRetry(ctx, pool, cfg.DBStartupMaxWait, cfg.DBStartupRetry, logger); err != nil {
 		return fmt.Errorf("db migration failed: %w", err)
 	}
 
@@ -105,4 +106,38 @@ func buildPublisher(ctx context.Context, cfg config.Config, logger *slog.Logger)
 	})
 
 	return events.NewSNSPublisher(client, cfg.SNSTopicARN, logger), nil
+}
+
+func migrateWithRetry(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	maxWait time.Duration,
+	retryInterval time.Duration,
+	logger *slog.Logger,
+) error {
+	deadlineCtx, cancel := context.WithTimeout(ctx, maxWait)
+	defer cancel()
+
+	var lastErr error
+	for {
+		lastErr = db.Migrate(deadlineCtx, pool)
+		if lastErr == nil {
+			return nil
+		}
+
+		if deadlineCtx.Err() != nil {
+			return lastErr
+		}
+
+		logger.Warn("db migration attempt failed; retrying",
+			"err", lastErr,
+			"retry_in", retryInterval.String(),
+		)
+
+		select {
+		case <-deadlineCtx.Done():
+			return lastErr
+		case <-time.After(retryInterval):
+		}
+	}
 }
