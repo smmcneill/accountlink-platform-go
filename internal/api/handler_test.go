@@ -23,7 +23,6 @@ func testService() *app.AccountLinkService {
 		newAPIFakeRepo(),
 		newAPIFakeIdem(),
 		new(apiFakeOutbox),
-		apiFakeClock{now: time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)},
 	)
 }
 
@@ -100,8 +99,6 @@ func TestCreateBlankUserIDReturns400(t *testing.T) {
 }
 
 type (
-	apiFakeClock struct{ now time.Time }
-
 	apiFakeTx struct{}
 
 	apiFakeTxManager struct{}
@@ -118,8 +115,6 @@ type (
 
 	apiFakeOutbox struct{}
 )
-
-func (f apiFakeClock) Now() time.Time { return f.now }
 
 func (apiFakeTx) Commit(context.Context) error   { return nil }
 func (apiFakeTx) Rollback(context.Context) error { return nil }

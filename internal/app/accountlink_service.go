@@ -20,18 +20,12 @@ var (
 )
 
 type (
-	Clock interface {
-		Now() time.Time
-	}
-
-	RealClock struct{}
-
 	AccountLinkService struct {
 		txManager domain.TxManager
 		repo      domain.AccountLinkRepository
 		idem      domain.IdempotencyRepository
 		outbox    domain.OutboxRepository
-		clock     Clock
+		now       func() time.Time
 	}
 
 	CreateAccountLinkResult struct {
@@ -47,16 +41,15 @@ type (
 	}
 )
 
-func (RealClock) Now() time.Time { return time.Now().UTC() }
+func UTCNow() time.Time { return time.Now().UTC() }
 
 func NewAccountLinkService(
 	txManager domain.TxManager,
 	repo domain.AccountLinkRepository,
 	idem domain.IdempotencyRepository,
 	outbox domain.OutboxRepository,
-	clock Clock,
 ) *AccountLinkService {
-	return &AccountLinkService{txManager: txManager, repo: repo, idem: idem, outbox: outbox, clock: clock}
+	return &AccountLinkService{txManager: txManager, repo: repo, idem: idem, outbox: outbox, now: UTCNow}
 }
 
 func (s *AccountLinkService) GetByID(ctx context.Context, id uuid.UUID) (domain.AccountLink, error) {
@@ -208,7 +201,7 @@ func (s *AccountLinkService) writeAccountLinkCreatedOutbox(ctx context.Context, 
 		AggregateType: "AccountLink",
 		AggregateID:   link.ID.String(),
 		Payload:       string(payload),
-		CreatedAt:     s.clock.Now(),
+		CreatedAt:     s.now(),
 		PublishedAt:   nil,
 	})
 }

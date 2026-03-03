@@ -59,16 +59,14 @@ func run() error {
 	idem := persistence.NewIdempotencyStore(pool)
 	outbox := persistence.NewOutboxStore()
 
-	var clock app.RealClock
-
-	svc := app.NewAccountLinkService(txManager, repo, idem, outbox, clock)
+	svc := app.NewAccountLinkService(txManager, repo, idem, outbox)
 
 	publisher, err := buildPublisher(ctx, cfg, logger)
 	if err != nil {
 		return fmt.Errorf("event publisher setup failed: %w", err)
 	}
 
-	processor := app.NewOutboxProcessor(txManager, outbox, publisher, clock, cfg.OutboxPollBatch, cfg.OutboxPollDelay, logger)
+	processor := app.NewOutboxProcessor(txManager, outbox, publisher, cfg.OutboxPollBatch, cfg.OutboxPollDelay, logger)
 	go processor.Start(ctx)
 
 	apiHandler := api.NewHandler(svc)

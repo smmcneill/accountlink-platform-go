@@ -12,7 +12,7 @@ type OutboxProcessor struct {
 	txManager domain.TxManager
 	outbox    domain.OutboxRepository
 	publisher domain.EventPublisher
-	clock     Clock
+	now       func() time.Time
 	batchSize int
 	pollDelay time.Duration
 	logger    *slog.Logger
@@ -22,7 +22,6 @@ func NewOutboxProcessor(
 	txManager domain.TxManager,
 	outbox domain.OutboxRepository,
 	publisher domain.EventPublisher,
-	clock Clock,
 	batchSize int,
 	pollDelay time.Duration,
 	logger *slog.Logger,
@@ -31,7 +30,7 @@ func NewOutboxProcessor(
 		txManager: txManager,
 		outbox:    outbox,
 		publisher: publisher,
-		clock:     clock,
+		now:       UTCNow,
 		batchSize: batchSize,
 		pollDelay: pollDelay,
 		logger:    logger,
@@ -70,7 +69,7 @@ func (p *OutboxProcessor) PublishOnce(ctx context.Context, batchSize int) error 
 	}
 
 	for _, event := range events {
-		now := p.clock.Now()
+		now := p.now()
 		if err := p.publisher.Publish(ctx, domain.PublishedEvent{
 			OutboxID:      event.ID,
 			EventType:     event.EventType,

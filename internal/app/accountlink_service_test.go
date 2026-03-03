@@ -3,135 +3,75 @@ package app
 import (
 	"context"
 	"errors"
-	"sync"
 	"testing"
 	"time"
 
 	"accountlink-platform-go/internal/domain"
+	domainmocks "accountlink-platform-go/internal/domain/mocks"
 
 	"github.com/google/uuid"
+	"go.uber.org/mock/gomock"
 )
-
-type (
-	fakeClock struct{ now time.Time }
-
-	fakeTx struct{}
-
-	fakeTxManager struct{}
-
-	fakeRepo struct {
-		mu    sync.Mutex
-		links map[uuid.UUID]domain.AccountLink
-	}
-
-	fakeIdem struct {
-		mu      sync.Mutex
-		records map[string]domain.IdempotencyRecord
-	}
-
-	fakeOutbox struct {
-		mu     sync.Mutex
-		events []domain.OutboxEvent
-	}
-)
-
-func (f fakeClock) Now() time.Time { return f.now }
-
-func (fakeTx) Commit(context.Context) error   { return nil }
-func (fakeTx) Rollback(context.Context) error { return nil }
-
-func (fakeTxManager) Begin(context.Context) (domain.Tx, error) { return fakeTx{}, nil }
-
-func newFakeRepo() *fakeRepo { return &fakeRepo{links: map[uuid.UUID]domain.AccountLink{}} }
-
-func (r *fakeRepo) FindByID(_ context.Context, id uuid.UUID) (domain.AccountLink, bool, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	link, ok := r.links[id]
-
-	return link, ok, nil
-}
-
-func (r *fakeRepo) Save(_ context.Context, _ domain.Tx, link domain.AccountLink) (domain.AccountLink, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.links[link.ID] = link
-
-	return link, nil
-}
-
-func newFakeIdem() *fakeIdem { return &fakeIdem{records: map[string]domain.IdempotencyRecord{}} }
-
-func (f *fakeIdem) FindByKey(_ context.Context, key string) (domain.IdempotencyRecord, bool, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	r, ok := f.records[key]
-
-	return r, ok, nil
-}
-
-func (f *fakeIdem) TryInsert(_ context.Context, _ domain.Tx, rec domain.IdempotencyRecord) (bool, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	if _, exists := f.records[rec.Key]; exists {
-		return false, nil
-	}
-
-	f.records[rec.Key] = rec
-
-	return true, nil
-}
-
-func (f *fakeOutbox) Add(_ context.Context, _ domain.Tx, event domain.OutboxEvent) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	f.events = append(f.events, event)
-
-	return nil
-}
-
-func (f *fakeOutbox) FindUnpublishedForUpdateSkipLocked(_ context.Context, _ domain.Tx, _ int) ([]domain.OutboxEvent, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	pending := make([]domain.OutboxEvent, 0)
-
-	for _, evt := range f.events {
-		if evt.PublishedAt == nil {
-			pending = append(pending, evt)
-		}
-	}
-
-	return pending, nil
-}
-
-func (f *fakeOutbox) MarkPublished(_ context.Context, _ domain.Tx, id uuid.UUID, publishedAt time.Time) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	for i := range f.events {
-		if f.events[i].ID == id {
-			f.events[i].PublishedAt = &publishedAt
-		}
-	}
-
-	return nil
-}
 
 func TestCreateWithSameKeySamePayloadReturnsSameResource(t *testing.T) {
-	s := NewAccountLinkService(fakeTxManager{}, newFakeRepo(), newFakeIdem(), new(fakeOutbox), fakeClock{now: time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)})
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	r1, err := s.Create(context.Background(), "idem-1", "user-123", "Chase")
+	txManager := domainmocks.NewMockTxManager(ctrl)
+	tx := domainmocks.NewMockTx(ctrl)
+	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
+	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
+	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+
+	fixedNow := time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)
+	createdID := uuid.New()
+	created := domain.AccountLink{
+		ID:                  createdID,
+		UserID:              "user-123",
+		ExternalInstitution: "Chase",
+		Status:              domain.LinkStatusPending,
+	}
+	requestHash := sha256Hex("user-123|Chase")
+
+	gomock.InOrder(
+		idem.EXPECT().FindByKey(gomock.Any(), "idem-1").Return(domain.IdempotencyRecord{}, false, nil),
+		txManager.EXPECT().Begin(gomock.Any()).Return(tx, nil),
+		repo.EXPECT().Save(gomock.Any(), tx, gomock.Any()).Return(created, nil),
+		idem.EXPECT().TryInsert(gomock.Any(), tx, gomock.AssignableToTypeOf(domain.IdempotencyRecord{})).
+			DoAndReturn(func(_ context.Context, _ domain.Tx, rec domain.IdempotencyRecord) (bool, error) {
+				if rec.Key != "idem-1" || rec.RequestHash != requestHash || rec.AccountLinkID != createdID {
+					t.Fatalf("unexpected idempotency record: %+v", rec)
+				}
+
+				return true, nil
+			}),
+		outbox.EXPECT().Add(gomock.Any(), tx, gomock.AssignableToTypeOf(domain.OutboxEvent{})).
+			DoAndReturn(func(_ context.Context, _ domain.Tx, event domain.OutboxEvent) error {
+				if event.CreatedAt != fixedNow {
+					t.Fatalf("unexpected event timestamp: got %v want %v", event.CreatedAt, fixedNow)
+				}
+
+				return nil
+			}),
+		tx.EXPECT().Commit(gomock.Any()).Return(nil),
+		tx.EXPECT().Rollback(gomock.Any()).Return(nil),
+		idem.EXPECT().FindByKey(gomock.Any(), "idem-1").Return(domain.IdempotencyRecord{
+			Key:           "idem-1",
+			RequestHash:   requestHash,
+			AccountLinkID: createdID,
+		}, true, nil),
+		repo.EXPECT().FindByID(gomock.Any(), createdID).Return(created, true, nil),
+	)
+
+	svc := NewAccountLinkService(txManager, repo, idem, outbox)
+	svc.now = func() time.Time { return fixedNow }
+
+	r1, err := svc.Create(context.Background(), "idem-1", "user-123", "Chase")
 	if err != nil {
 		t.Fatalf("first create failed: %v", err)
 	}
 
-	r2, err := s.Create(context.Background(), "idem-1", "user-123", "Chase")
+	r2, err := svc.Create(context.Background(), "idem-1", "user-123", "Chase")
 	if err != nil {
 		t.Fatalf("second create failed: %v", err)
 	}
@@ -150,14 +90,47 @@ func TestCreateWithSameKeySamePayloadReturnsSameResource(t *testing.T) {
 }
 
 func TestCreateWithSameKeyDifferentPayloadReturnsConflict(t *testing.T) {
-	s := NewAccountLinkService(fakeTxManager{}, newFakeRepo(), newFakeIdem(), new(fakeOutbox), fakeClock{now: time.Now().UTC()})
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	_, err := s.Create(context.Background(), "idem-2", "user-123", "Chase")
+	txManager := domainmocks.NewMockTxManager(ctrl)
+	tx := domainmocks.NewMockTx(ctrl)
+	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
+	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
+	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+
+	createdID := uuid.New()
+	created := domain.AccountLink{
+		ID:                  createdID,
+		UserID:              "user-123",
+		ExternalInstitution: "Chase",
+		Status:              domain.LinkStatusPending,
+	}
+	initialHash := sha256Hex("user-123|Chase")
+
+	gomock.InOrder(
+		idem.EXPECT().FindByKey(gomock.Any(), "idem-2").Return(domain.IdempotencyRecord{}, false, nil),
+		txManager.EXPECT().Begin(gomock.Any()).Return(tx, nil),
+		repo.EXPECT().Save(gomock.Any(), tx, gomock.Any()).Return(created, nil),
+		idem.EXPECT().TryInsert(gomock.Any(), tx, gomock.Any()).Return(true, nil),
+		outbox.EXPECT().Add(gomock.Any(), tx, gomock.Any()).Return(nil),
+		tx.EXPECT().Commit(gomock.Any()).Return(nil),
+		tx.EXPECT().Rollback(gomock.Any()).Return(nil),
+		idem.EXPECT().FindByKey(gomock.Any(), "idem-2").Return(domain.IdempotencyRecord{
+			Key:           "idem-2",
+			RequestHash:   initialHash,
+			AccountLinkID: createdID,
+		}, true, nil),
+	)
+
+	svc := NewAccountLinkService(txManager, repo, idem, outbox)
+
+	_, err := svc.Create(context.Background(), "idem-2", "user-123", "Chase")
 	if err != nil {
 		t.Fatalf("setup create failed: %v", err)
 	}
 
-	_, err = s.Create(context.Background(), "idem-2", "user-999", "Chase")
+	_, err = svc.Create(context.Background(), "idem-2", "user-999", "Chase")
 	if !errors.Is(err, ErrIdempotencyConflict) {
 		t.Fatalf("expected idempotency conflict, got %v", err)
 	}
