@@ -21,7 +21,7 @@ func testService() *app.AccountLinkService {
 		apiFakeTxManager{},
 		newAPIFakeRepo(),
 		newAPIFakeIdem(),
-		&apiFakeOutbox{},
+		new(apiFakeOutbox),
 		apiFakeClock{now: time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)},
 	)
 }

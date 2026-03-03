@@ -12,7 +12,7 @@ import (
 type OutboxStore struct{}
 
 func NewOutboxStore() *OutboxStore {
-	return &OutboxStore{}
+	return new(OutboxStore)
 }
 
 func (s *OutboxStore) Add(ctx context.Context, tx domain.Tx, event domain.OutboxEvent) error {

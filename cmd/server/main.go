@@ -57,7 +57,8 @@ func main() {
 	repo := persistence.NewAccountLinkStore(pool)
 	idem := persistence.NewIdempotencyStore(pool)
 	outbox := persistence.NewOutboxStore()
-	clock := app.RealClock{}
+
+	var clock app.RealClock
 
 	svc := app.NewAccountLinkService(txManager, repo, idem, outbox, clock)
 

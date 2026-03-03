@@ -124,7 +124,7 @@ func (f *fakeOutbox) MarkPublished(_ context.Context, _ domain.Tx, id uuid.UUID,
 }
 
 func TestCreateWithSameKeySamePayloadReturnsSameResource(t *testing.T) {
-	s := NewAccountLinkService(fakeTxManager{}, newFakeRepo(), newFakeIdem(), &fakeOutbox{}, fakeClock{now: time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)})
+	s := NewAccountLinkService(fakeTxManager{}, newFakeRepo(), newFakeIdem(), new(fakeOutbox), fakeClock{now: time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)})
 
 	r1, err := s.Create(context.Background(), "idem-1", "user-123", "Chase")
 	if err != nil {
@@ -150,7 +150,7 @@ func TestCreateWithSameKeySamePayloadReturnsSameResource(t *testing.T) {
 }
 
 func TestCreateWithSameKeyDifferentPayloadReturnsConflict(t *testing.T) {
-	s := NewAccountLinkService(fakeTxManager{}, newFakeRepo(), newFakeIdem(), &fakeOutbox{}, fakeClock{now: time.Now().UTC()})
+	s := NewAccountLinkService(fakeTxManager{}, newFakeRepo(), newFakeIdem(), new(fakeOutbox), fakeClock{now: time.Now().UTC()})
 
 	_, err := s.Create(context.Background(), "idem-2", "user-123", "Chase")
 	if err != nil {

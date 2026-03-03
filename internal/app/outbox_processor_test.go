@@ -29,7 +29,7 @@ func TestPublishOnceMarksPublished(t *testing.T) {
 		Payload:       `{"x":1}`,
 		CreatedAt:     time.Now().UTC(),
 	}}}
-	pub := &fakePublisher{}
+	pub := new(fakePublisher)
 	p := NewOutboxProcessor(fakeTxManager{}, outbox, pub, fakeClock{now: time.Now().UTC()}, 10, time.Second, slog.Default())
 
 	if err := p.PublishOnce(context.Background(), 10); err != nil {
