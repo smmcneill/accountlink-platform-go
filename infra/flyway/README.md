@@ -1,14 +1,11 @@
 # Flyway Config
 
-Create per-environment Flyway config files in this directory.
+Per-environment config files are expected at:
+- `infra/flyway/dev.conf`
+- `infra/flyway/test.conf`
+- `infra/flyway/prod.conf`
 
-Example: `infra/flyway/dev.conf`
+Starter files are checked in with `REPLACE_ME_*` placeholders.
+Update `flyway.url`, `flyway.user`, and `flyway.password` before running migrations.
 
-```conf
-flyway.url=jdbc:postgresql://localhost:5432/accountlink
-flyway.user=accountlink
-flyway.password=accountlink
-flyway.locations=filesystem:./migrations
-```
-
-`just flyway-migrate <env>` expects `infra/flyway/<env>.conf`.
+`just flyway-migrate <env>` reads `infra/flyway/<env>.conf`.

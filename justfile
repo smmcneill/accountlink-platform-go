@@ -61,9 +61,18 @@ cdk-deploy env:
     @just build-linux-binary
     @cd infra/cdk && npm install && npx cdk deploy --all --require-approval never -c envName={{env}}
 
-release env:
+cdk-deploy-foundation env app_name="accountlink":
+    @just build-linux-binary
+    @cd infra/cdk && npm install && npx cdk deploy --require-approval never -c envName={{env}} -c appName={{app_name}} {{app_name}}-{{env}}-foundation
+
+cdk-deploy-service env app_name="accountlink":
+    @just build-linux-binary
+    @cd infra/cdk && npm install && npx cdk deploy --require-approval never -c envName={{env}} -c appName={{app_name}} {{app_name}}-{{env}}-service
+
+release env app_name="accountlink":
+    @just cdk-deploy-foundation env={{env}} app_name={{app_name}}
     @just flyway-migrate {{env}}
-    @just cdk-deploy {{env}}
+    @just cdk-deploy-service env={{env}} app_name={{app_name}}
 
 db-up:
     @docker compose up -d postgres
