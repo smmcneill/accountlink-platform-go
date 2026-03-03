@@ -30,3 +30,23 @@ go run ./cmd/server
 
 ## Local dependencies
 Use the same docker compose as the Java project for Postgres + LocalStack.
+
+## Cloud Deployment (CDK + Flyway)
+- CDK code lives in `infra/cdk` (TypeScript).
+- Stack targets ECS Fargate + Application Load Balancer + Route53 record.
+- Flyway config files should live in `infra/flyway/<env>.conf`.
+
+### Required deployment env vars
+- `IMAGE_URI` (container image, e.g. ECR URI)
+- `HOSTED_ZONE_DOMAIN` (e.g. `example.com`)
+- `RECORD_NAME` (e.g. `api`; use empty string for zone apex)
+- `CERTIFICATE_ARN` (ACM cert in same region as ALB)
+- Optional: `VPC_ID`, `CONTAINER_PORT` (default `8080`), `DESIRED_COUNT` (default `1`), `APP_NAME`, `ENV_NAME`
+
+### Commands
+```bash
+just setup
+just flyway-migrate dev
+just cdk-deploy dev
+just release dev
+```
