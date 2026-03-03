@@ -11,9 +11,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type PostgresTx struct {
-	tx pgx.Tx
-}
+type (
+	PostgresTx struct {
+		tx pgx.Tx
+	}
+
+	TxManager struct {
+		pool *pgxpool.Pool
+	}
+)
 
 func (t *PostgresTx) Commit(ctx context.Context) error {
 	if t.tx == nil {
@@ -35,10 +41,6 @@ func (t *PostgresTx) Rollback(ctx context.Context) error {
 		return nil
 	}
 	return err
-}
-
-type TxManager struct {
-	pool *pgxpool.Pool
 }
 
 func NewTxManager(pool *pgxpool.Pool) *TxManager {

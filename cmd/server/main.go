@@ -29,8 +29,12 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	cfg, err := config.Load()
+	if err != nil {
+		logger.Error("config load failed", "err", err)
+		os.Exit(1)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -100,14 +104,7 @@ func buildPublisher(ctx context.Context, cfg config.Config, logger *slog.Logger)
 		awsconfig.WithRegion(cfg.SNSRegion),
 	}
 	if cfg.SNSEndpoint != "" {
-		resolver := awsv2.EndpointResolverWithOptionsFunc(func(service, region string, _ ...interface{}) (awsv2.Endpoint, error) {
-			if service == sns.ServiceID {
-				return awsv2.Endpoint{URL: cfg.SNSEndpoint, SigningRegion: cfg.SNSRegion}, nil
-			}
-			return awsv2.Endpoint{}, &awsv2.EndpointNotFoundError{}
-		})
 		loadOptions = append(loadOptions,
-			awsconfig.WithEndpointResolverWithOptions(resolver),
 			awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
 		)
 	}
@@ -116,5 +113,11 @@ func buildPublisher(ctx context.Context, cfg config.Config, logger *slog.Logger)
 	if err != nil {
 		return nil, err
 	}
-	return events.NewSNSPublisher(sns.NewFromConfig(awsCfg), cfg.SNSTopicARN, logger), nil
+	client := sns.NewFromConfig(awsCfg, func(o *sns.Options) {
+		if cfg.SNSEndpoint != "" {
+			o.BaseEndpoint = awsv2.String(cfg.SNSEndpoint)
+		}
+	})
+
+	return events.NewSNSPublisher(client, cfg.SNSTopicARN, logger), nil
 }

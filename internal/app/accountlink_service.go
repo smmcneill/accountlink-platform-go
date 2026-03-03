@@ -19,33 +19,35 @@ var (
 	ErrNotFound            = errors.New("account link not found")
 )
 
-type Clock interface {
-	Now() time.Time
-}
+type (
+	Clock interface {
+		Now() time.Time
+	}
 
-type RealClock struct{}
+	RealClock struct{}
+
+	AccountLinkService struct {
+		txManager domain.TxManager
+		repo      domain.AccountLinkRepository
+		idem      domain.IdempotencyRepository
+		outbox    domain.OutboxRepository
+		clock     Clock
+	}
+
+	CreateAccountLinkResult struct {
+		Link    domain.AccountLink
+		Created bool
+	}
+
+	accountLinkCreatedPayload struct {
+		ID                  uuid.UUID `json:"id"`
+		UserID              string    `json:"userId"`
+		ExternalInstitution string    `json:"externalInstitution"`
+		Status              string    `json:"status"`
+	}
+)
 
 func (RealClock) Now() time.Time { return time.Now().UTC() }
-
-type AccountLinkService struct {
-	txManager domain.TxManager
-	repo      domain.AccountLinkRepository
-	idem      domain.IdempotencyRepository
-	outbox    domain.OutboxRepository
-	clock     Clock
-}
-
-type CreateAccountLinkResult struct {
-	Link    domain.AccountLink
-	Created bool
-}
-
-type accountLinkCreatedPayload struct {
-	ID                  uuid.UUID `json:"id"`
-	UserID              string    `json:"userId"`
-	ExternalInstitution string    `json:"externalInstitution"`
-	Status              string    `json:"status"`
-}
 
 func NewAccountLinkService(
 	txManager domain.TxManager,

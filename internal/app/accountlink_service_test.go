@@ -12,23 +12,35 @@ import (
 	"github.com/google/uuid"
 )
 
-type fakeClock struct{ now time.Time }
+type (
+	fakeClock struct{ now time.Time }
+
+	fakeTx struct{}
+
+	fakeTxManager struct{}
+
+	fakeRepo struct {
+		mu    sync.Mutex
+		links map[uuid.UUID]domain.AccountLink
+	}
+
+	fakeIdem struct {
+		mu      sync.Mutex
+		records map[string]domain.IdempotencyRecord
+	}
+
+	fakeOutbox struct {
+		mu     sync.Mutex
+		events []domain.OutboxEvent
+	}
+)
 
 func (f fakeClock) Now() time.Time { return f.now }
-
-type fakeTx struct{}
 
 func (fakeTx) Commit(context.Context) error   { return nil }
 func (fakeTx) Rollback(context.Context) error { return nil }
 
-type fakeTxManager struct{}
-
 func (fakeTxManager) Begin(context.Context) (domain.Tx, error) { return fakeTx{}, nil }
-
-type fakeRepo struct {
-	mu    sync.Mutex
-	links map[uuid.UUID]domain.AccountLink
-}
 
 func newFakeRepo() *fakeRepo { return &fakeRepo{links: map[uuid.UUID]domain.AccountLink{}} }
 
@@ -44,11 +56,6 @@ func (r *fakeRepo) Save(_ context.Context, _ domain.Tx, link domain.AccountLink)
 	defer r.mu.Unlock()
 	r.links[link.ID] = link
 	return link, nil
-}
-
-type fakeIdem struct {
-	mu      sync.Mutex
-	records map[string]domain.IdempotencyRecord
 }
 
 func newFakeIdem() *fakeIdem { return &fakeIdem{records: map[string]domain.IdempotencyRecord{}} }
@@ -68,11 +75,6 @@ func (f *fakeIdem) TryInsert(_ context.Context, _ domain.Tx, rec domain.Idempote
 	}
 	f.records[rec.Key] = rec
 	return true, nil
-}
-
-type fakeOutbox struct {
-	mu     sync.Mutex
-	events []domain.OutboxEvent
 }
 
 func (f *fakeOutbox) Add(_ context.Context, _ domain.Tx, event domain.OutboxEvent) error {

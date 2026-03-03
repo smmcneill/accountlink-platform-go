@@ -78,23 +78,32 @@ func TestCreateBlankUserIDReturns400(t *testing.T) {
 	}
 }
 
-type apiFakeClock struct{ now time.Time }
+type (
+	apiFakeClock struct{ now time.Time }
+
+	apiFakeTx struct{}
+
+	apiFakeTxManager struct{}
+
+	apiFakeRepo struct {
+		mu    sync.Mutex
+		links map[uuid.UUID]domain.AccountLink
+	}
+
+	apiFakeIdem struct {
+		mu      sync.Mutex
+		records map[string]domain.IdempotencyRecord
+	}
+
+	apiFakeOutbox struct{}
+)
 
 func (f apiFakeClock) Now() time.Time { return f.now }
-
-type apiFakeTx struct{}
 
 func (apiFakeTx) Commit(context.Context) error   { return nil }
 func (apiFakeTx) Rollback(context.Context) error { return nil }
 
-type apiFakeTxManager struct{}
-
 func (apiFakeTxManager) Begin(context.Context) (domain.Tx, error) { return apiFakeTx{}, nil }
-
-type apiFakeRepo struct {
-	mu    sync.Mutex
-	links map[uuid.UUID]domain.AccountLink
-}
 
 func newAPIFakeRepo() *apiFakeRepo { return &apiFakeRepo{links: map[uuid.UUID]domain.AccountLink{}} }
 
@@ -109,11 +118,6 @@ func (r *apiFakeRepo) Save(_ context.Context, _ domain.Tx, link domain.AccountLi
 	defer r.mu.Unlock()
 	r.links[link.ID] = link
 	return link, nil
-}
-
-type apiFakeIdem struct {
-	mu      sync.Mutex
-	records map[string]domain.IdempotencyRecord
 }
 
 func newAPIFakeIdem() *apiFakeIdem {
@@ -136,8 +140,6 @@ func (i *apiFakeIdem) TryInsert(_ context.Context, _ domain.Tx, rec domain.Idemp
 	i.records[rec.Key] = rec
 	return true, nil
 }
-
-type apiFakeOutbox struct{}
 
 func (*apiFakeOutbox) Add(context.Context, domain.Tx, domain.OutboxEvent) error { return nil }
 func (*apiFakeOutbox) FindUnpublishedForUpdateSkipLocked(context.Context, domain.Tx, int) ([]domain.OutboxEvent, error) {

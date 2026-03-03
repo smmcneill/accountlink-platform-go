@@ -6,20 +6,22 @@ import (
 	"github.com/google/uuid"
 )
 
-type LinkStatus string
+type (
+	LinkStatus string
+
+	AccountLink struct {
+		ID                  uuid.UUID  `json:"id"`
+		UserID              string     `json:"userId"`
+		ExternalInstitution string     `json:"externalInstitution"`
+		Status              LinkStatus `json:"status"`
+	}
+)
 
 const (
 	LinkStatusPending LinkStatus = "PENDING"
 	LinkStatusActive  LinkStatus = "ACTIVE"
 	LinkStatusFailed  LinkStatus = "FAILED"
 )
-
-type AccountLink struct {
-	ID                  uuid.UUID  `json:"id"`
-	UserID              string     `json:"userId"`
-	ExternalInstitution string     `json:"externalInstitution"`
-	Status              LinkStatus `json:"status"`
-}
 
 func NewAccountLink(id uuid.UUID, userID, externalInstitution string, status LinkStatus) (AccountLink, error) {
 	if id == uuid.Nil {

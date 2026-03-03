@@ -12,20 +12,22 @@ import (
 	"github.com/google/uuid"
 )
 
-type Handler struct {
-	service *app.AccountLinkService
-}
+type (
+	Handler struct {
+		service *app.AccountLinkService
+	}
 
-type createAccountLinkRequest struct {
-	UserID              string `json:"userId"`
-	ExternalInstitution string `json:"externalInstitution"`
-}
+	createAccountLinkRequest struct {
+		UserID              string `json:"userId"`
+		ExternalInstitution string `json:"externalInstitution"`
+	}
 
-type problemDetail struct {
-	Title  string `json:"title"`
-	Status int    `json:"status"`
-	Detail string `json:"detail"`
-}
+	problemDetail struct {
+		Title  string `json:"title"`
+		Status int    `json:"status"`
+		Detail string `json:"detail"`
+	}
+)
 
 func NewHandler(service *app.AccountLinkService) *Handler {
 	return &Handler{service: service}
