@@ -13,6 +13,7 @@ linters:
     - staticcheck
     - unused
     - revive
+    - wsl_v5
   settings:
     revive:
       rules:

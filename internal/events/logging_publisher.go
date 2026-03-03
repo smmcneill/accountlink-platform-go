@@ -25,5 +25,6 @@ func (p *LoggingPublisher) Publish(_ context.Context, event domain.PublishedEven
 		slog.Int64("outbox.published_at", event.PublishedAt.UnixMilli()),
 		slog.Int("payload.size", len(event.Payload)),
 	)
+
 	return nil
 }

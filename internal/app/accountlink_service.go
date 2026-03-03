@@ -64,9 +64,11 @@ func (s *AccountLinkService) GetByID(ctx context.Context, id uuid.UUID) (domain.
 	if err != nil {
 		return domain.AccountLink{}, err
 	}
+
 	if !ok {
 		return domain.AccountLink{}, fmt.Errorf("%w: %s", ErrNotFound, id)
 	}
+
 	return link, nil
 }
 
@@ -76,10 +78,12 @@ func (s *AccountLinkService) Create(ctx context.Context, idemKey, userID, extern
 	}
 
 	requestHash := sha256Hex(userID + "|" + externalInstitution)
+
 	rec, found, err := s.idem.FindByKey(ctx, idemKey)
 	if err != nil {
 		return CreateAccountLinkResult{}, err
 	}
+
 	if found {
 		return s.replay(ctx, rec, requestHash)
 	}
@@ -88,7 +92,10 @@ func (s *AccountLinkService) Create(ctx context.Context, idemKey, userID, extern
 	if err != nil {
 		return CreateAccountLinkResult{}, err
 	}
-	defer tx.Rollback(ctx)
+
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	created, err := s.createNew(ctx, tx, userID, externalInstitution)
 	if err != nil {
@@ -108,22 +115,27 @@ func (s *AccountLinkService) Create(ctx context.Context, idemKey, userID, extern
 		if err := s.writeAccountLinkCreatedOutbox(ctx, tx, created); err != nil {
 			return CreateAccountLinkResult{}, err
 		}
+
 		if err := tx.Commit(ctx); err != nil {
 			return CreateAccountLinkResult{}, err
 		}
+
 		return CreateAccountLinkResult{Link: created, Created: true}, nil
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return CreateAccountLinkResult{}, err
 	}
+
 	nowRec, nowFound, err := s.idem.FindByKey(ctx, idemKey)
 	if err != nil {
 		return CreateAccountLinkResult{}, err
 	}
+
 	if !nowFound {
 		return CreateAccountLinkResult{}, fmt.Errorf("idempotency key existed but could not be read: %s", idemKey)
 	}
+
 	return s.replay(ctx, nowRec, requestHash)
 }
 
@@ -132,18 +144,24 @@ func (s *AccountLinkService) createNonIdempotent(ctx context.Context, userID, ex
 	if err != nil {
 		return CreateAccountLinkResult{}, err
 	}
-	defer tx.Rollback(ctx)
+
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	created, err := s.createNew(ctx, tx, userID, externalInstitution)
 	if err != nil {
 		return CreateAccountLinkResult{}, err
 	}
+
 	if err := s.writeAccountLinkCreatedOutbox(ctx, tx, created); err != nil {
 		return CreateAccountLinkResult{}, err
 	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return CreateAccountLinkResult{}, err
 	}
+
 	return CreateAccountLinkResult{Link: created, Created: true}, nil
 }
 
@@ -151,13 +169,16 @@ func (s *AccountLinkService) replay(ctx context.Context, rec domain.IdempotencyR
 	if rec.RequestHash != requestHash {
 		return CreateAccountLinkResult{}, ErrIdempotencyConflict
 	}
+
 	link, ok, err := s.repo.FindByID(ctx, rec.AccountLinkID)
 	if err != nil {
 		return CreateAccountLinkResult{}, err
 	}
+
 	if !ok {
 		return CreateAccountLinkResult{}, fmt.Errorf("idempotency record referenced missing AccountLink: %s", rec.AccountLinkID)
 	}
+
 	return CreateAccountLinkResult{Link: link, Created: false}, nil
 }
 
@@ -166,6 +187,7 @@ func (s *AccountLinkService) createNew(ctx context.Context, tx domain.Tx, userID
 	if err != nil {
 		return domain.AccountLink{}, err
 	}
+
 	return s.repo.Save(ctx, tx, link)
 }
 

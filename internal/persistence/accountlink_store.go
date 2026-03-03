@@ -34,12 +34,15 @@ WHERE id = $1`
 		if err == pgx.ErrNoRows {
 			return domain.AccountLink{}, false, nil
 		}
+
 		return domain.AccountLink{}, false, err
 	}
+
 	link, err := domain.NewAccountLink(rowID, userID, extIns, domain.LinkStatus(status))
 	if err != nil {
 		return domain.AccountLink{}, false, err
 	}
+
 	return link, true, nil
 }
 
@@ -57,5 +60,6 @@ ON CONFLICT (id) DO UPDATE SET
 	if err != nil {
 		return domain.AccountLink{}, err
 	}
+
 	return link, nil
 }

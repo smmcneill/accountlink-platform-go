@@ -30,11 +30,13 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
 	cfg, err := config.Load()
 	if err != nil {
 		logger.Error("config load failed", "err", err)
 		os.Exit(1)
 	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -43,6 +45,7 @@ func main() {
 		logger.Error("db connect failed", "err", err)
 		os.Exit(1)
 	}
+
 	defer pool.Close()
 
 	if err := db.Migrate(ctx, pool); err != nil {
@@ -57,6 +60,7 @@ func main() {
 	clock := app.RealClock{}
 
 	svc := app.NewAccountLinkService(txManager, repo, idem, outbox, clock)
+
 	publisher, err := buildPublisher(ctx, cfg, logger)
 	if err != nil {
 		logger.Error("event publisher setup failed", "err", err)
@@ -80,6 +84,7 @@ func main() {
 
 	go func() {
 		logger.Info("server_starting", "addr", server.Addr)
+
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("server failed", "err", err)
 			stop()
@@ -87,8 +92,10 @@ func main() {
 	}()
 
 	<-ctx.Done()
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	_ = server.Shutdown(shutdownCtx)
 }
 
@@ -96,6 +103,7 @@ func buildPublisher(ctx context.Context, cfg config.Config, logger *slog.Logger)
 	if cfg.EventTarget != "sns" {
 		return events.NewLoggingPublisher(logger), nil
 	}
+
 	if cfg.SNSTopicARN == "" {
 		return nil, fmt.Errorf("ACCOUNTLINK_SNS_TOPIC_ARN is required when EVENT_TARGET=sns")
 	}
@@ -113,6 +121,7 @@ func buildPublisher(ctx context.Context, cfg config.Config, logger *slog.Logger)
 	if err != nil {
 		return nil, err
 	}
+
 	client := sns.NewFromConfig(awsCfg, func(o *sns.Options) {
 		if cfg.SNSEndpoint != "" {
 			o.BaseEndpoint = awsv2.String(cfg.SNSEndpoint)

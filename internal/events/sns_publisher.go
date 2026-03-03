@@ -60,5 +60,6 @@ func (p *SNSPublisher) Publish(ctx context.Context, event domain.PublishedEvent)
 		slog.String("aggregate.id", event.AggregateID),
 		slog.Int("payload.size", len(event.Payload)),
 	)
+
 	return nil
 }

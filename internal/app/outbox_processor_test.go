@@ -39,6 +39,7 @@ func TestPublishOnceMarksPublished(t *testing.T) {
 	if len(pub.published) != 1 {
 		t.Fatalf("expected one published event")
 	}
+
 	pending, _ := outbox.FindUnpublishedForUpdateSkipLocked(context.Background(), fakeTx{}, 10)
 	if len(pending) != 0 {
 		t.Fatalf("expected no pending events after publish")

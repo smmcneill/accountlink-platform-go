@@ -24,18 +24,22 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			return fmt.Errorf("migration failed for statement %q: %w", stmt, err)
 		}
 	}
+
 	return nil
 }
 
 func splitSQLStatements(src string) []string {
 	parts := strings.Split(src, ";")
+
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
 		s := strings.TrimSpace(p)
 		if s == "" {
 			continue
 		}
+
 		out = append(out, s)
 	}
+
 	return out
 }

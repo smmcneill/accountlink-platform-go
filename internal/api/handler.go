@@ -38,6 +38,7 @@ func (h *Handler) Routes() http.Handler {
 	r.Get("/_health", h.health)
 	r.Get("/account-links/{id}", h.getAccountLink)
 	r.Post("/account-links", h.createAccountLink)
+
 	return r
 }
 
@@ -59,9 +60,12 @@ func (h *Handler) getAccountLink(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, http.StatusNotFound, "Not Found", err.Error())
 			return
 		}
+
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error", "Request failed")
+
 		return
 	}
+
 	writeJSON(w, http.StatusOK, link)
 }
 
@@ -71,7 +75,9 @@ func (h *Handler) createAccountLink(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "Bad Request", "Malformed JSON")
 		return
 	}
+
 	req.UserID = strings.TrimSpace(req.UserID)
+
 	req.ExternalInstitution = strings.TrimSpace(req.ExternalInstitution)
 	if req.UserID == "" || req.ExternalInstitution == "" {
 		writeProblem(w, http.StatusBadRequest, "Bad Request", "userId and externalInstitution must not be blank")
@@ -84,16 +90,20 @@ func (h *Handler) createAccountLink(w http.ResponseWriter, r *http.Request) {
 			writeProblem(w, http.StatusConflict, "Conflict", "Idempotency-Key was reused with a different request payload.")
 			return
 		}
+
 		writeProblem(w, http.StatusInternalServerError, "Internal Server Error", "Request failed")
+
 		return
 	}
 
 	location := "/account-links/" + result.Link.ID.String()
 	w.Header().Set("Location", location)
+
 	if result.Created {
 		writeJSON(w, http.StatusCreated, result.Link)
 		return
 	}
+
 	writeJSON(w, http.StatusOK, result.Link)
 }
 

@@ -25,10 +25,12 @@ func (t *PostgresTx) Commit(ctx context.Context) error {
 	if t.tx == nil {
 		return nil
 	}
+
 	err := t.tx.Commit(ctx)
 	if errors.Is(err, pgx.ErrTxClosed) {
 		return nil
 	}
+
 	return err
 }
 
@@ -36,10 +38,12 @@ func (t *PostgresTx) Rollback(ctx context.Context) error {
 	if t.tx == nil {
 		return nil
 	}
+
 	err := t.tx.Rollback(ctx)
 	if errors.Is(err, pgx.ErrTxClosed) {
 		return nil
 	}
+
 	return err
 }
 
@@ -52,6 +56,7 @@ func (m *TxManager) Begin(ctx context.Context) (domain.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &PostgresTx{tx: tx}, nil
 }
 
@@ -60,5 +65,6 @@ func unwrapTx(tx domain.Tx) pgx.Tx {
 	if !ok || pgtx.tx == nil {
 		panic(fmt.Sprintf("unexpected tx type %T", tx))
 	}
+
 	return pgtx.tx
 }

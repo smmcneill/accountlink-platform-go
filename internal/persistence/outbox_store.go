@@ -31,6 +31,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7)`
 		event.CreatedAt,
 		event.PublishedAt,
 	)
+
 	return err
 }
 
@@ -50,6 +51,7 @@ FOR UPDATE SKIP LOCKED`
 	defer rows.Close()
 
 	out := make([]domain.OutboxEvent, 0)
+
 	for rows.Next() {
 		var evt domain.OutboxEvent
 		if err := rows.Scan(
@@ -63,16 +65,21 @@ FOR UPDATE SKIP LOCKED`
 		); err != nil {
 			return nil, err
 		}
+
 		out = append(out, evt)
 	}
+
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
 	return out, nil
 }
 
 func (s *OutboxStore) MarkPublished(ctx context.Context, tx domain.Tx, id uuid.UUID, publishedAt time.Time) error {
 	const q = `UPDATE outbox_events SET published_at = $2 WHERE id = $1`
+
 	_, err := unwrapTx(tx).Exec(ctx, q, id, publishedAt)
+
 	return err
 }

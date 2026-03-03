@@ -59,7 +59,10 @@ func (p *OutboxProcessor) PublishOnce(ctx context.Context, batchSize int) error 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	events, err := p.outbox.FindUnpublishedForUpdateSkipLocked(ctx, tx, batchSize)
 	if err != nil {
@@ -79,6 +82,7 @@ func (p *OutboxProcessor) PublishOnce(ctx context.Context, batchSize int) error 
 		}); err != nil {
 			return err
 		}
+
 		if err := p.outbox.MarkPublished(ctx, tx, event.ID, now); err != nil {
 			return err
 		}

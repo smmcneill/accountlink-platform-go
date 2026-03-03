@@ -28,8 +28,10 @@ WHERE idem_key = $1`
 		if err == pgx.ErrNoRows {
 			return domain.IdempotencyRecord{}, false, nil
 		}
+
 		return domain.IdempotencyRecord{}, false, err
 	}
+
 	return rec, true, nil
 }
 
@@ -43,5 +45,6 @@ ON CONFLICT (idem_key) DO NOTHING`
 	if err != nil {
 		return false, err
 	}
+
 	return ct.RowsAffected() == 1, nil
 }

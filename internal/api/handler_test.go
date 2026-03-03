@@ -32,6 +32,7 @@ func TestHealthReturnsOK(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	h.Routes().ServeHTTP(w, req)
+
 	if w.Code != http.StatusOK || w.Body.String() != "ok" {
 		t.Fatalf("expected 200/ok, got %d/%q", w.Code, w.Body.String())
 	}
@@ -46,8 +47,10 @@ func TestCreateReplayReturns200(t *testing.T) {
 	req1 := httptest.NewRequest(http.MethodPost, "/account-links", bytes.NewReader(raw))
 	req1.Header.Set("Content-Type", "application/json")
 	req1.Header.Set("Idempotency-Key", "k-123")
+
 	w1 := httptest.NewRecorder()
 	h.Routes().ServeHTTP(w1, req1)
+
 	if w1.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d", w1.Code)
 	}
@@ -55,11 +58,14 @@ func TestCreateReplayReturns200(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodPost, "/account-links", bytes.NewReader(raw))
 	req2.Header.Set("Content-Type", "application/json")
 	req2.Header.Set("Idempotency-Key", "k-123")
+
 	w2 := httptest.NewRecorder()
 	h.Routes().ServeHTTP(w2, req2)
+
 	if w2.Code != http.StatusOK {
 		t.Fatalf("expected 200 replay, got %d", w2.Code)
 	}
+
 	if w2.Header().Get("Location") == "" {
 		t.Fatalf("expected location header")
 	}
@@ -70,9 +76,11 @@ func TestCreateBlankUserIDReturns400(t *testing.T) {
 	raw := []byte(`{"userId":"", "externalInstitution":"Chase"}`)
 	req := httptest.NewRequest(http.MethodPost, "/account-links", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
+
 	w := httptest.NewRecorder()
 
 	h.Routes().ServeHTTP(w, req)
+
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -110,13 +118,17 @@ func newAPIFakeRepo() *apiFakeRepo { return &apiFakeRepo{links: map[uuid.UUID]do
 func (r *apiFakeRepo) FindByID(_ context.Context, id uuid.UUID) (domain.AccountLink, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	v, ok := r.links[id]
+
 	return v, ok, nil
 }
 func (r *apiFakeRepo) Save(_ context.Context, _ domain.Tx, link domain.AccountLink) (domain.AccountLink, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	r.links[link.ID] = link
+
 	return link, nil
 }
 
@@ -127,17 +139,22 @@ func newAPIFakeIdem() *apiFakeIdem {
 func (i *apiFakeIdem) FindByKey(_ context.Context, key string) (domain.IdempotencyRecord, bool, error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+
 	r, ok := i.records[key]
+
 	return r, ok, nil
 }
 
 func (i *apiFakeIdem) TryInsert(_ context.Context, _ domain.Tx, rec domain.IdempotencyRecord) (bool, error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+
 	if _, ok := i.records[rec.Key]; ok {
 		return false, nil
 	}
+
 	i.records[rec.Key] = rec
+
 	return true, nil
 }
 
