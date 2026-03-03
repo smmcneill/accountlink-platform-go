@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: accountlink-postgres
+    environment:
+      POSTGRES_DB: accountlink
+      POSTGRES_USER: accountlink
+      POSTGRES_PASSWORD: accountlink
+    ports:
+      - "5444:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accountlink -d accountlink"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  localstack:
+    image: localstack/localstack:3
+    container_name: accountlink-localstack
+    environment:
+      SERVICES: sns
+      LS_LOG: trace
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  pgdata:
+  localstack:
