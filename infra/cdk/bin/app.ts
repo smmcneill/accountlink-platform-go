@@ -61,5 +61,6 @@ new ServiceStack(app, `${cfg.appName}-${cfg.envName}-service`, {
   vpc: foundation.vpc,
   dbCluster: foundation.dbCluster,
   dbSecurityGroup: foundation.dbSecurityGroup,
-  databaseName: foundation.databaseName
+  databaseName: foundation.databaseName,
+  eventTopic: foundation.eventTopic
 });

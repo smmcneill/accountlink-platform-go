@@ -9,6 +9,7 @@ import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as rds from "aws-cdk-lib/aws-rds";
+import * as sns from "aws-cdk-lib/aws-sns";
 import { Construct } from "constructs";
 
 export interface ServiceStackProps extends StackProps {
@@ -22,6 +23,7 @@ export interface ServiceStackProps extends StackProps {
   dbCluster: rds.DatabaseCluster;
   dbSecurityGroup: ec2.ISecurityGroup;
   databaseName: string;
+  eventTopic: sns.ITopic;
 }
 
 export class ServiceStack extends Stack {
@@ -98,6 +100,9 @@ export class ServiceStack extends Stack {
     container.addEnvironment("DB_PORT", props.dbCluster.clusterEndpoint.port.toString());
     container.addEnvironment("DB_NAME", props.databaseName);
     container.addEnvironment("DB_SSL_MODE", "require");
+    container.addEnvironment("EVENT_TARGET", "sns");
+    container.addEnvironment("ACCOUNTLINK_SNS_TOPIC_ARN", props.eventTopic.topicArn);
+    container.addEnvironment("ACCOUNTLINK_SNS_REGION", this.region);
 
     if (props.dbCluster.secret) {
       props.dbCluster.secret.grantRead(taskDefinition.taskRole);
@@ -107,6 +112,8 @@ export class ServiceStack extends Stack {
       container.addSecret("DB_USER", ecs.Secret.fromSecretsManager(props.dbCluster.secret, "username"));
       container.addSecret("DB_PASSWORD", ecs.Secret.fromSecretsManager(props.dbCluster.secret, "password"));
     }
+
+    props.eventTopic.grantPublish(taskDefinition.taskRole);
 
     const loadBalancer = new elbv2.ApplicationLoadBalancer(this, "Alb", {
       vpc: props.vpc,

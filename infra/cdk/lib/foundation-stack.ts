@@ -6,6 +6,7 @@ import {
 } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as rds from "aws-cdk-lib/aws-rds";
+import * as sns from "aws-cdk-lib/aws-sns";
 import { Construct } from "constructs";
 
 export interface FoundationStackProps extends StackProps {
@@ -19,6 +20,7 @@ export class FoundationStack extends Stack {
   readonly dbCluster: rds.DatabaseCluster;
   readonly dbSecurityGroup: ec2.SecurityGroup;
   readonly databaseName: string;
+  readonly eventTopic: sns.Topic;
 
   constructor(scope: Construct, id: string, props: FoundationStackProps) {
     super(scope, id, props);
@@ -55,6 +57,10 @@ export class FoundationStack extends Stack {
       deletionProtection: false
     });
 
+    this.eventTopic = new sns.Topic(this, "EventTopic", {
+      topicName: `${props.appName}-${props.envName}-events`
+    });
+
     new CfnOutput(this, "AuroraEndpoint", {
       value: this.dbCluster.clusterEndpoint.hostname
     });
@@ -63,6 +69,9 @@ export class FoundationStack extends Stack {
     });
     new CfnOutput(this, "AuroraSecretArn", {
       value: this.dbCluster.secret?.secretArn ?? ""
+    });
+    new CfnOutput(this, "EventTopicArn", {
+      value: this.eventTopic.topicArn
     });
   }
 }
