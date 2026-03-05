@@ -33,13 +33,11 @@ This README covers only the CDK project in `infra/cdk`.
 ## Install dependencies
 ```bash
 just infra-install
-# or
-cd infra/cdk && npm install
 ```
 
 ## Run infra tests
 ```bash
-cd infra/cdk && npm test
+just test-infra
 ```
 
 ## Environment configuration
@@ -76,20 +74,11 @@ Supported keys:
 - `imageAssetDockerfile` / `IMAGE_ASSET_DOCKERFILE`
 
 ## Bootstrap, synth, diff, deploy
-From repo root (preferred):
+From repo root:
 ```bash
 just cdk-bootstrap dev
 just cdk-synth dev
 just cdk-deploy dev
-```
-
-From `infra/cdk` directly:
-```bash
-npm install
-npx cdk bootstrap -c envName=dev
-npx cdk synth -c envName=dev
-npx cdk diff -c envName=dev
-npx cdk deploy --all --require-approval never -c envName=dev
 ```
 
 ## Deploy in stages
