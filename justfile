@@ -38,6 +38,8 @@ setup:
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew install golangci-lint
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew install flyway
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew install node
+    @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Installing Go mutation testing tool" "{{RESET_COLOR}}"
+    @go install github.com/avito-tech/go-mutesting/cmd/go-mutesting@latest
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Setup complete" "{{RESET_COLOR}}"
 
 # Run Go linters.
@@ -54,7 +56,13 @@ lint-fix:
 test-go:
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Running Go tests" "{{RESET_COLOR}}"
     @just fmt
-    @go test ./cmd/... ./internal/...
+    @go test ./cmd/... ./internal/... 
+    @just mutation
+
+# Run mutation tests (requires installing go-mutesting).
+mutation:
+    @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Running mutation tests for critical packages" "{{RESET_COLOR}}"
+    @go-mutesting ./internal/app ./internal/domain/accountlink.go
 
 # Run infrastructure tests (CDK TypeScript).
 test-infra:
@@ -63,10 +71,10 @@ test-infra:
 
 # Run all tests (application + infrastructure).
 test:
-    @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Running full test suite (application + infrastructure)" "{{RESET_COLOR}}"
-    @just test-go
-    @just test-infra
-    @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Full test suite complete" "{{RESET_COLOR}}"
+	@printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Running full test suite (application + infrastructure)" "{{RESET_COLOR}}"
+	@just test-go
+	@just test-infra
+	@printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Full test suite complete" "{{RESET_COLOR}}"
 
 # Install CDK app dependencies.
 infra-install:

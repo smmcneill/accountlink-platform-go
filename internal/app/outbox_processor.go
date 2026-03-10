@@ -30,7 +30,7 @@ func NewOutboxProcessor(
 		txManager: txManager,
 		outbox:    outbox,
 		publisher: publisher,
-		now:       UTCNow,
+		now:       func() time.Time { return time.Now().UTC() },
 		batchSize: batchSize,
 		pollDelay: pollDelay,
 		logger:    logger,

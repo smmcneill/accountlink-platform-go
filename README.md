@@ -69,3 +69,18 @@ just flyway-migrate dev
 just cdk-deploy dev
 just release dev
 ```
+
+### Mutation testing
+- `internal/app` and `internal/domain/accountlink.go` are included in the mutation check.
+- Run locally:
+- `just test-go` already runs unit tests plus mutation.
+- After running `just setup`, you can run just mutation with:
+```bash
+just mutation
+```
+- Or install manually:
+```bash
+go install github.com/avito-tech/go-mutesting/cmd/go-mutesting@latest
+go-mutesting ./internal/app ./internal/domain/accountlink.go
+```
+- Same command is executed in CI after unit tests, so regressions are caught automatically.

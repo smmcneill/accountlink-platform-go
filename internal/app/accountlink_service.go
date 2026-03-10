@@ -26,6 +26,7 @@ type (
 		idem      domain.IdempotencyRepository
 		outbox    domain.OutboxRepository
 		now       func() time.Time
+		marshal   func(interface{}) ([]byte, error)
 	}
 
 	CreateAccountLinkResult struct {
@@ -49,7 +50,14 @@ func NewAccountLinkService(
 	idem domain.IdempotencyRepository,
 	outbox domain.OutboxRepository,
 ) *AccountLinkService {
-	return &AccountLinkService{txManager: txManager, repo: repo, idem: idem, outbox: outbox, now: UTCNow}
+	return &AccountLinkService{
+		txManager: txManager,
+		repo:      repo,
+		idem:      idem,
+		outbox:    outbox,
+		now:       UTCNow,
+		marshal:   json.Marshal,
+	}
 }
 
 func (s *AccountLinkService) GetByID(ctx context.Context, id uuid.UUID) (domain.AccountLink, error) {
@@ -185,7 +193,7 @@ func (s *AccountLinkService) createNew(ctx context.Context, tx domain.Tx, userID
 }
 
 func (s *AccountLinkService) writeAccountLinkCreatedOutbox(ctx context.Context, tx domain.Tx, link domain.AccountLink) error {
-	payload, err := json.Marshal(accountLinkCreatedPayload{
+	payload, err := s.marshal(accountLinkCreatedPayload{
 		ID:                  link.ID,
 		UserID:              link.UserID,
 		ExternalInstitution: link.ExternalInstitution,
