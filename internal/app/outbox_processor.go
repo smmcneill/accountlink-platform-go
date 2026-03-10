@@ -3,38 +3,73 @@ package app
 import (
 	"context"
 	"log/slog"
+	"io"
 	"time"
 
 	"accountlink-platform-go/internal/domain"
 )
 
-type OutboxProcessor struct {
-	txManager domain.TxManager
-	outbox    domain.OutboxRepository
-	publisher domain.EventPublisher
-	now       func() time.Time
-	batchSize int
-	pollDelay time.Duration
-	logger    *slog.Logger
+type (
+	OutboxProcessor struct {
+		txManager domain.TxManager
+		outbox    domain.OutboxRepository
+		publisher domain.EventPublisher
+		now       func() time.Time
+		batchSize int
+		pollDelay time.Duration
+		logger    *slog.Logger
+	}
+
+	OutboxProcessorOption func(*OutboxProcessor)
+)
+
+func WithOutboxProcessorBatchSize(batchSize int) OutboxProcessorOption {
+	return func(p *OutboxProcessor) {
+		p.batchSize = batchSize
+	}
+}
+
+func WithOutboxProcessorPollDelay(delay time.Duration) OutboxProcessorOption {
+	return func(p *OutboxProcessor) {
+		p.pollDelay = delay
+	}
+}
+
+func WithOutboxProcessorLogger(logger *slog.Logger) OutboxProcessorOption {
+	return func(p *OutboxProcessor) {
+		if logger != nil {
+			p.logger = logger
+		}
+	}
+}
+
+func WithOutboxProcessorNow(now func() time.Time) OutboxProcessorOption {
+	return func(p *OutboxProcessor) {
+		p.now = now
+	}
 }
 
 func NewOutboxProcessor(
 	txManager domain.TxManager,
 	outbox domain.OutboxRepository,
 	publisher domain.EventPublisher,
-	batchSize int,
-	pollDelay time.Duration,
-	logger *slog.Logger,
+	opts ...OutboxProcessorOption,
 ) *OutboxProcessor {
-	return &OutboxProcessor{
+	p := &OutboxProcessor{
 		txManager: txManager,
 		outbox:    outbox,
 		publisher: publisher,
 		now:       func() time.Time { return time.Now().UTC() },
-		batchSize: batchSize,
-		pollDelay: pollDelay,
-		logger:    logger,
+		batchSize: 10,
+		pollDelay: time.Second,
+		logger:    slog.New(slog.NewJSONHandler(io.Discard, nil)),
 	}
+
+	for _, option := range opts {
+		option(p)
+	}
+
+	return p
 }
 
 func (p *OutboxProcessor) Start(ctx context.Context) {

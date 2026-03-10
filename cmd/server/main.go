@@ -67,7 +67,14 @@ func run() error {
 		return fmt.Errorf("event publisher setup failed: %w", err)
 	}
 
-	processor := app.NewOutboxProcessor(txManager, outbox, publisher, cfg.OutboxPollBatch, cfg.OutboxPollDelay, logger)
+	processor := app.NewOutboxProcessor(
+		txManager,
+		outbox,
+		publisher,
+		app.WithOutboxProcessorBatchSize(cfg.OutboxPollBatch),
+		app.WithOutboxProcessorPollDelay(cfg.OutboxPollDelay),
+		app.WithOutboxProcessorLogger(logger),
+	)
 	go processor.Start(ctx)
 
 	apiHandler := api.NewHandler(svc)

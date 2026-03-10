@@ -53,7 +53,13 @@ func TestPublishOnceMarksPublished(t *testing.T) {
 		tx.EXPECT().Rollback(gomock.Any()).Return(nil),
 	)
 
-	p := NewOutboxProcessor(txManager, outbox, publisher, 10, time.Second, nil)
+	p := NewOutboxProcessor(
+		txManager,
+		outbox,
+		publisher,
+		WithOutboxProcessorBatchSize(10),
+		WithOutboxProcessorPollDelay(time.Second),
+	)
 	p.now = func() time.Time { return publishedAt }
 
 	if err := p.PublishOnce(context.Background(), 10); err != nil {
@@ -72,7 +78,13 @@ func TestPublishOnceReturnsErrorWhenTransactionBeginFails(t *testing.T) {
 	beginErr := errors.New("begin failed")
 	txManager.EXPECT().Begin(gomock.Any()).Return(nil, beginErr)
 
-	p := NewOutboxProcessor(txManager, outbox, publisher, 10, time.Second, nil)
+	p := NewOutboxProcessor(
+		txManager,
+		outbox,
+		publisher,
+		WithOutboxProcessorBatchSize(10),
+		WithOutboxProcessorPollDelay(time.Second),
+	)
 	if err := p.PublishOnce(context.Background(), 10); !errors.Is(err, beginErr) {
 		t.Fatalf("expected begin error, got %v", err)
 	}
@@ -94,7 +106,13 @@ func TestPublishOnceReturnsErrorWhenFindFails(t *testing.T) {
 		tx.EXPECT().Rollback(gomock.Any()).Return(nil),
 	)
 
-	p := NewOutboxProcessor(txManager, outbox, publisher, 10, time.Second, nil)
+	p := NewOutboxProcessor(
+		txManager,
+		outbox,
+		publisher,
+		WithOutboxProcessorBatchSize(10),
+		WithOutboxProcessorPollDelay(time.Second),
+	)
 	if err := p.PublishOnce(context.Background(), 10); !errors.Is(err, findErr) {
 		t.Fatalf("expected find error, got %v", err)
 	}
@@ -126,7 +144,13 @@ func TestPublishOnceReturnsErrorWhenPublishFails(t *testing.T) {
 		tx.EXPECT().Rollback(gomock.Any()).Return(nil),
 	)
 
-	p := NewOutboxProcessor(txManager, outbox, publisher, 10, time.Second, nil)
+	p := NewOutboxProcessor(
+		txManager,
+		outbox,
+		publisher,
+		WithOutboxProcessorBatchSize(10),
+		WithOutboxProcessorPollDelay(time.Second),
+	)
 	p.now = func() time.Time { return time.Now() }
 	if err := p.PublishOnce(context.Background(), 10); !errors.Is(err, publishErr) {
 		t.Fatalf("expected publish error, got %v", err)
@@ -160,7 +184,13 @@ func TestPublishOnceReturnsErrorWhenMarkPublishedFails(t *testing.T) {
 		tx.EXPECT().Rollback(gomock.Any()).Return(nil),
 	)
 
-	p := NewOutboxProcessor(txManager, outbox, publisher, 10, time.Second, nil)
+	p := NewOutboxProcessor(
+		txManager,
+		outbox,
+		publisher,
+		WithOutboxProcessorBatchSize(10),
+		WithOutboxProcessorPollDelay(time.Second),
+	)
 	if err := p.PublishOnce(context.Background(), 10); !errors.Is(err, markErr) {
 		t.Fatalf("expected mark published error, got %v", err)
 	}
@@ -201,7 +231,14 @@ func TestStartLogsPublishErrors(t *testing.T) {
 
 	handler := &recordingHandler{}
 	logger := slog.New(handler)
-	p := NewOutboxProcessor(txManager, outbox, publisher, 1, 5*time.Millisecond, logger)
+	p := NewOutboxProcessor(
+		txManager,
+		outbox,
+		publisher,
+		WithOutboxProcessorBatchSize(1),
+		WithOutboxProcessorPollDelay(5*time.Millisecond),
+		WithOutboxProcessorLogger(logger),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})

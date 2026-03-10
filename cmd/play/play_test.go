@@ -3,6 +3,8 @@ package play
 import (
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type (
@@ -41,4 +43,6 @@ func TestSugar(t *testing.T) {
 
 	// normal method call sugar for comparison
 	fmt.Println(c.Add(n)) // 15
+
+	assert.Equal(t, "", "")
 }
