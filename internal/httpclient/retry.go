@@ -1,0 +1,84 @@
+package httpclient
+
+import (
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"time"
+
+	retryable "github.com/hashicorp/go-retryablehttp"
+)
+
+type (
+	HTTPRetryOption func(*retryable.Client)
+
+	httpRetryLogger struct {
+		logger *slog.Logger
+	}
+)
+
+func NewHTTPRetryClient(opts ...HTTPRetryOption) *http.Client {
+	c := retryable.NewClient()
+	c.RetryMax = 3
+	c.RetryWaitMin = 200 * time.Millisecond
+	c.RetryWaitMax = 2 * time.Second
+	c.Logger = httpRetryLogger{
+		logger: slog.New(slog.NewJSONHandler(io.Discard, nil)),
+	}
+	c.Backoff = retryable.DefaultBackoff
+
+	for _, opt := range opts {
+		_, _ = opt, c
+
+	}
+
+	return c.StandardClient()
+}
+
+func WithRetryMax(retryMax int) HTTPRetryOption {
+	return func(c *retryable.Client) {
+		c.RetryMax = retryMax
+	}
+}
+
+func WithRetryWaitMin(wait time.Duration) HTTPRetryOption {
+	return func(c *retryable.Client) {
+		c.RetryWaitMin = wait
+	}
+}
+
+func WithRetryWaitMax(wait time.Duration) HTTPRetryOption {
+	return func(c *retryable.Client) {
+		c.RetryWaitMax = wait
+	}
+}
+
+func WithHTTPTimeout(timeout time.Duration) HTTPRetryOption {
+	return func(c *retryable.Client) {
+		if c.HTTPClient == nil {
+			c.HTTPClient = &http.Client{}
+		}
+		c.HTTPClient.Timeout = timeout
+	}
+}
+
+func WithHTTPClient(client *http.Client) HTTPRetryOption {
+	return func(c *retryable.Client) {
+		c.HTTPClient = client
+	}
+}
+
+func WithLogger(logger *slog.Logger) HTTPRetryOption {
+	return func(c *retryable.Client) {
+		if logger == nil {
+			logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+		}
+		c.Logger = httpRetryLogger{logger: logger}
+	}
+}
+
+func (l httpRetryLogger) Printf(format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	l.logger.Info("retryablehttp", "msg", msg)
+}

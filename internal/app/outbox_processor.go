@@ -2,8 +2,8 @@ package app
 
 import (
 	"context"
-	"log/slog"
 	"io"
+	"log/slog"
 	"time"
 
 	"accountlink-platform-go/internal/domain"

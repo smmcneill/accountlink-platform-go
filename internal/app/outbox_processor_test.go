@@ -67,6 +67,104 @@ func TestPublishOnceMarksPublished(t *testing.T) {
 	}
 }
 
+func TestNewOutboxProcessorDefaults(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	txManager := domainmocks.NewMockTxManager(ctrl)
+	tx := domainmocks.NewMockTx(ctrl)
+	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	publisher := domainmocks.NewMockEventPublisher(ctrl)
+
+	gomock.InOrder(
+		txManager.EXPECT().Begin(gomock.Any()).Return(tx, nil),
+		outbox.EXPECT().FindUnpublishedForUpdateSkipLocked(gomock.Any(), tx, 10).Return(nil, nil),
+		tx.EXPECT().Commit(gomock.Any()).Return(nil),
+		tx.EXPECT().Rollback(gomock.Any()).Return(nil),
+	)
+
+	p := NewOutboxProcessor(
+		txManager,
+		outbox,
+		publisher,
+	)
+	if err := p.PublishOnce(context.Background(), p.batchSize); err != nil {
+		t.Fatalf("publish once failed: %v", err)
+	}
+
+	if p.batchSize != 10 {
+		t.Fatalf("expected default batch size 10, got %d", p.batchSize)
+	}
+}
+
+func TestWithOutboxProcessorBatchSizeOption(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	txManager := domainmocks.NewMockTxManager(ctrl)
+	tx := domainmocks.NewMockTx(ctrl)
+	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	publisher := domainmocks.NewMockEventPublisher(ctrl)
+
+	gomock.InOrder(
+		txManager.EXPECT().Begin(gomock.Any()).Return(tx, nil),
+		outbox.EXPECT().FindUnpublishedForUpdateSkipLocked(gomock.Any(), tx, 7).Return(nil, nil),
+		tx.EXPECT().Commit(gomock.Any()).Return(nil),
+		tx.EXPECT().Rollback(gomock.Any()).Return(nil),
+	)
+
+	p := NewOutboxProcessor(
+		txManager,
+		outbox,
+		publisher,
+		WithOutboxProcessorBatchSize(7),
+	)
+	if err := p.PublishOnce(context.Background(), p.batchSize); err != nil {
+		t.Fatalf("publish once failed: %v", err)
+	}
+}
+
+func TestWithOutboxProcessorNowOption(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	txManager := domainmocks.NewMockTxManager(ctrl)
+	tx := domainmocks.NewMockTx(ctrl)
+	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	publisher := domainmocks.NewMockEventPublisher(ctrl)
+
+	outboxID := uuid.New()
+	createdAt := time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)
+	publishedAt := createdAt.Add(3 * time.Minute)
+	event := domain.OutboxEvent{
+		ID:            outboxID,
+		EventType:     "AccountLinkCreated",
+		AggregateType: "AccountLink",
+		AggregateID:   "agg-1",
+		Payload:       `{"x":1}`,
+		CreatedAt:     createdAt,
+	}
+
+	gomock.InOrder(
+		txManager.EXPECT().Begin(gomock.Any()).Return(tx, nil),
+		outbox.EXPECT().FindUnpublishedForUpdateSkipLocked(gomock.Any(), tx, 10).Return([]domain.OutboxEvent{event}, nil),
+		publisher.EXPECT().Publish(gomock.Any(), gomock.Any()).Return(nil),
+		outbox.EXPECT().MarkPublished(gomock.Any(), tx, outboxID, publishedAt).Return(nil),
+		tx.EXPECT().Commit(gomock.Any()).Return(nil),
+		tx.EXPECT().Rollback(gomock.Any()).Return(nil),
+	)
+
+	p := NewOutboxProcessor(
+		txManager,
+		outbox,
+		publisher,
+		WithOutboxProcessorNow(func() time.Time { return publishedAt }),
+	)
+	if err := p.PublishOnce(context.Background(), p.batchSize); err != nil {
+		t.Fatalf("publish once failed: %v", err)
+	}
+}
+
 func TestPublishOnceReturnsErrorWhenTransactionBeginFails(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
