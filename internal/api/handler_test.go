@@ -15,7 +15,6 @@ import (
 	"accountlink-platform-go/internal/app"
 	"accountlink-platform-go/internal/domain"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -29,12 +28,18 @@ func testService() *app.AccountLinkService {
 }
 
 func testRouter(h *Handler) http.Handler {
-	r := chi.NewRouter()
-	r.Get("/_health", h.Health)
-	r.Get("/account-links/{id}", h.GetAccountLink)
-	r.Post("/account-links", h.CreateAccountLink)
-
-	return r
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.URL.Path == "/account-links" && req.Method == http.MethodPost:
+			h.CreateAccountLink(w, req)
+		case req.URL.Path != "/account-links" && strings.HasPrefix(req.URL.Path, "/account-links/") && req.Method == http.MethodGet:
+			h.GetAccountLink(w, req)
+		case req.URL.Path == "/_health" && req.Method == http.MethodGet:
+			h.Health(w, req)
+		default:
+			http.NotFound(w, req)
+		}
+	})
 }
 
 func TestHealthReturnsOK(t *testing.T) {

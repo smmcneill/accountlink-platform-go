@@ -3,20 +3,19 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"accountlink-platform-go/internal/api"
 	"accountlink-platform-go/internal/middleware"
-
-	"github.com/go-chi/chi/v5"
-	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
 type (
 	Server struct {
-		router     *chi.Mux
+		router     *http.ServeMux
 		httpServer *http.Server
 		logger     *slog.Logger
 	}
@@ -24,29 +23,62 @@ type (
 	MyError struct{ error }
 )
 
-func (MyError) Error() string {
-	return ""
+func (e MyError) Error() string {
+	return e.Error()
 }
 
 func New(addr string, logger *slog.Logger, handler *api.Handler) *Server {
-	router := chi.NewRouter()
-	router.Use(chimw.Recoverer)
-	router.Use(middleware.Logging(logger))
-	router.Get("/_health", handler.Health)
-	router.Get("/account-links/{id}", handler.GetAccountLink)
-	router.Post("/account-links", handler.CreateAccountLink)
+	mux := http.NewServeMux()
+	mux.Handle("/_health", enforceMethod(http.MethodGet, handler.Health))
+	mux.Handle("/account-links/", enforceMethod(http.MethodGet, handler.GetAccountLink))
+	mux.Handle("/account-links", enforceMethod(http.MethodPost, handler.CreateAccountLink))
+
+	h := middleware.Logging(logger)(mux)
+	h = recoverMiddleware(logger)(h)
 
 	httpServer := &http.Server{
 		Addr:              addr,
-		Handler:           router,
+		Handler:           h,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	return &Server{
-		router:     router,
+		router:     mux,
 		httpServer: httpServer,
 		logger:     logger,
 	}
+}
+
+func recoverMiddleware(logger *slog.Logger) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					logger.Error("http panic",
+						"err", recovered,
+						"method", r.Method,
+						"path", r.URL.Path,
+						"stack", string(debug.Stack()),
+					)
+
+					w.WriteHeader(http.StatusInternalServerError)
+					_, _ = w.Write([]byte("internal server error"))
+				}
+			}()
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func enforceMethod(method string, next http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != method {
+			w.Header().Set("Allow", method)
+			http.Error(w, fmt.Sprintf("%s not allowed for this route", r.Method), http.StatusMethodNotAllowed)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) Run(ctx context.Context) error {

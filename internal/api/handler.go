@@ -7,17 +7,12 @@ import (
 	"strings"
 
 	"accountlink-platform-go/internal/app"
-
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
 type (
-	URLParamFunc func(r *http.Request, key string) string
-
 	Handler struct {
-		service  *app.AccountLinkService
-		urlParam URLParamFunc
+		service *app.AccountLinkService
 	}
 
 	createAccountLinkRequest struct {
@@ -34,8 +29,7 @@ type (
 
 func NewHandler(service *app.AccountLinkService) *Handler {
 	return &Handler{
-		service:  service,
-		urlParam: chi.URLParam,
+		service: service,
 	}
 }
 
@@ -45,7 +39,7 @@ func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *Handler) GetAccountLink(w http.ResponseWriter, r *http.Request) {
-	id, err := uuid.Parse(h.urlParam(r, "id"))
+	id, err := uuid.Parse(strings.TrimPrefix(r.URL.Path, "/account-links/"))
 	if err != nil {
 		writeProblem(w, http.StatusBadRequest, "Bad Request", "Invalid account link id")
 		return
