@@ -114,8 +114,7 @@ func (p *OutboxProcessor) PublishOnce(ctx context.Context, batchSize int) error 
 			PublishedAt:   now,
 			Payload:       event.Payload,
 		}); err != nil {
-			_ = err
-
+			return err
 		}
 
 		if err := p.outbox.MarkPublished(ctx, tx, event.ID, now); err != nil {

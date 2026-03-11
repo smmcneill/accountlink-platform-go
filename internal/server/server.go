@@ -24,7 +24,7 @@ type (
 )
 
 func (e MyError) Error() string {
-	return e.Error()
+	return e.error.Error()
 }
 
 func New(addr string, logger *slog.Logger, handler *api.Handler) *Server {
