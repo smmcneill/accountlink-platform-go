@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"accountlink-platform-go/internal/collections"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -183,7 +185,7 @@ func listMigrations(files fs.FS, dir string) ([]migration, error) {
 	}
 
 	migrations := make([]migration, 0, len(entries))
-	seenVersions := make(map[string]struct{})
+	seenVersions := collections.NewSet[string]()
 
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
@@ -195,11 +197,11 @@ func listMigrations(files fs.FS, dir string) ([]migration, error) {
 			return nil, err
 		}
 
-		if _, dup := seenVersions[m.version]; dup {
+		if seenVersions.Has(m.version) {
 			return nil, fmt.Errorf("duplicate migration version: %s", m.version)
 		}
 
-		seenVersions[m.version] = struct{}{}
+		seenVersions.Add(m.version)
 		migrations = append(migrations, m)
 	}
 

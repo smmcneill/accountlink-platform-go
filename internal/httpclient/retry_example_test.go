@@ -40,7 +40,11 @@ func TestNewHTTPRetryClientRetriesTransientFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			t.Fatalf("failed to close response body: %v", closeErr)
+		}
+	}()
 
 	body, _ := io.ReadAll(resp.Body)
 	if string(body) != "ok" {

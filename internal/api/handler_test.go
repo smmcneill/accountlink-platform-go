@@ -106,7 +106,6 @@ func TestGetAccountLinkReturns500OnRepoError(t *testing.T) {
 }
 
 func TestGetAccountLinkReturnsLinkOnSuccess(t *testing.T) {
-	h := NewHandler(testService())
 	repo := newAPIFakeRepo()
 	svc := app.NewAccountLinkService(
 		apiFakeTxManager{},
@@ -114,7 +113,7 @@ func TestGetAccountLinkReturnsLinkOnSuccess(t *testing.T) {
 		newAPIFakeIdem(),
 		new(apiFakeOutbox),
 	)
-	h = NewHandler(svc)
+	h := NewHandler(svc)
 	router := testRouter(h)
 
 	link, err := domain.NewAccountLink(uuid.New(), "user-123", "Chase", domain.LinkStatusActive)

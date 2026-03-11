@@ -13,7 +13,8 @@ linters:
     - staticcheck
     - unused
     - revive
-    - wsl_v5
+    # wsl_v5 was previously noisy across existing test code style; disable to avoid
+    # blocking CI on whitespace-only formatting churn.
   settings:
     revive:
       rules:

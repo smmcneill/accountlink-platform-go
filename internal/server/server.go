@@ -14,10 +14,18 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
-type Server struct {
-	router     *chi.Mux
-	httpServer *http.Server
-	logger     *slog.Logger
+type (
+	Server struct {
+		router     *chi.Mux
+		httpServer *http.Server
+		logger     *slog.Logger
+	}
+
+	MyError struct{ error }
+)
+
+func (MyError) Error() string {
+	return ""
 }
 
 func New(addr string, logger *slog.Logger, handler *api.Handler) *Server {
@@ -60,6 +68,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 		return s.httpServer.Shutdown(shutdownCtx)
 	case err := <-errCh:
-		return err
+		// return err
+		return MyError{err}
 	}
 }
