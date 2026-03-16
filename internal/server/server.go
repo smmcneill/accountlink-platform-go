@@ -29,9 +29,9 @@ func (e MyError) Error() string {
 
 func New(addr string, logger *slog.Logger, handler *api.Handler) *Server {
 	mux := http.NewServeMux()
-	mux.Handle("/_health", enforceMethod(http.MethodGet, handler.Health))
-	mux.Handle("/account-links/", enforceMethod(http.MethodGet, handler.GetAccountLink))
-	mux.Handle("/account-links", enforceMethod(http.MethodPost, handler.CreateAccountLink))
+	mux.Handle("/_health", enforceMethod(http.MethodGet, handler.Health, logger))
+	mux.Handle("/account-links/", enforceMethod(http.MethodGet, handler.GetAccountLink, logger))
+	mux.Handle("/account-links", enforceMethod(http.MethodPost, handler.CreateAccountLink, logger))
 
 	h := middleware.Logging(logger)(mux)
 	h = recoverMiddleware(logger)(h)
@@ -70,10 +70,12 @@ func recoverMiddleware(logger *slog.Logger) func(next http.Handler) http.Handler
 	}
 }
 
-func enforceMethod(method string, next http.HandlerFunc) http.Handler {
+func enforceMethod(method string, next http.HandlerFunc, logger *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger.Info("method_invoked", "method", r.Method, "path", r.URL.Path, "expected", method)
 		if r.Method != method {
 			w.Header().Set("Allow", method)
+			logger.Warn("method_not_allowed", "method", r.Method, "path", r.URL.Path, "expected", method)
 			http.Error(w, fmt.Sprintf("%s not allowed for this route", r.Method), http.StatusMethodNotAllowed)
 			return
 		}

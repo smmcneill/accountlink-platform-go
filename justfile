@@ -53,6 +53,19 @@ lint-fix:
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Running Go linters with auto-fix" "{{RESET_COLOR}}"
     @golangci-lint run --fix ./cmd/... ./internal/...
 
+# Run isolated BDD tests (godog) under test/.
+# Caller must source env before running:
+#   . local.env && just test-bdd
+# Required environment variable:
+#   BDD_BASE_URL
+test-bdd:
+    @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Running BDD tests" "{{RESET_COLOR}}"
+    @if [ -z "${BDD_BASE_URL:-}" ]; then \
+        printf "%b%s%b\n" "{{ERROR_COLOR}}" "BDD_BASE_URL is required to run BDD tests. Source your env file first, e.g. '. local.env'." "{{RESET_COLOR}}"; \
+        exit 1; \
+    fi; \
+    BDD_BASE_URL="$BDD_BASE_URL" cd test && go test -count=1 -v ./...
+
 # Run application tests (Go).
 test-go:
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Running Go tests" "{{RESET_COLOR}}"
