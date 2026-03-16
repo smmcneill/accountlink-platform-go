@@ -124,6 +124,12 @@ cdk-deploy env:
     @cd infra/cdk && npm install && npx cdk deploy --all --require-approval never -c envName={{env}}
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> CDK deploy complete for env={{env}}" "{{RESET_COLOR}}"
 
+# Destroy all CDK stacks for an environment.
+cdk-undeploy env:
+    @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Destroying all CDK stacks for env={{env}}" "{{RESET_COLOR}}"
+    @cd infra/cdk && npm install && npx cdk destroy --all --force -c envName={{env}}
+    @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> CDK destroy complete for env={{env}}" "{{RESET_COLOR}}"
+
 # Deploy only the foundation stack (network/database).
 cdk-deploy-foundation env app_name="accountlink":
     @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Deploying foundation stack for app={{app_name}}, env={{env}}" "{{RESET_COLOR}}"
