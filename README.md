@@ -65,9 +65,11 @@ Use the same docker compose as the Java project for Postgres + LocalStack.
 ### Commands
 ```bash
 just setup
-just flyway-migrate dev
-just cdk-deploy dev
-just release dev
+source local.env
+just flyway-migrate
+source dev.env
+just cdk-deploy
+just release
 ```
 
 ### Mutation testing
