@@ -144,7 +144,6 @@ cdk-deploy: require-env
 cdk-undeploy: require-env
     @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Destroying all CDK stacks for env=$ENV" "{{RESET_COLOR}}"
     @cd infra/cdk && npm install && npx cdk destroy --all --force -c envName=$ENV
-    @cd infra/cdk && npm install && npx cdk destroy --all --force -c envName=$ENV
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> CDK destroy complete for env=$ENV" "{{RESET_COLOR}}"
 
 # Deploy only the foundation stack (network/database).
