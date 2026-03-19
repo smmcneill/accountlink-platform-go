@@ -54,7 +54,7 @@ lint-fix:
     @golangci-lint run --fix ./cmd/... ./internal/...
 
 # Ensure required shell variables are available before running environment-sensitive recipes.
-require-env:
+_require-env:
     @if [ -z "${ENV:-}" ]; then \
         printf "%b%s%b\n" "{{ERROR_COLOR}}" "In order to run this recipe, you must source an environment file, for example '. local.env'." "{{RESET_COLOR}}"; \
         exit 1; \
@@ -65,7 +65,7 @@ require-env:
 #   . local.env && just test-bdd
 # Required environment variable:
 #   BDD_BASE_URL
-test-bdd: require-env
+test-bdd: _require-env
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Running BDD tests" "{{RESET_COLOR}}"
     BDD_BASE_URL="$BDD_BASE_URL" cd test && go test -count=1 -v ./...
 
@@ -111,7 +111,7 @@ build-linux-binary platform="linux/amd64":
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Binary available at build/server" "{{RESET_COLOR}}"
 
 # Run Flyway migrations for a target environment (expects infra/flyway/<ENV>.conf).
-flyway-migrate: require-env
+flyway-migrate: _require-env
     @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Running Flyway migration for env=$ENV" "{{RESET_COLOR}}"
     @if [ ! -f "infra/flyway/$ENV.conf" ]; then \
         printf "%b%s%b\n" "{{ERROR_COLOR}}" "Missing Flyway config: infra/flyway/$ENV.conf" "{{RESET_COLOR}}"; \
@@ -121,47 +121,47 @@ flyway-migrate: require-env
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Flyway migration complete for env=$ENV" "{{RESET_COLOR}}"
 
 # Bootstrap CDK resources in target account/region.
-cdk-bootstrap: require-env
+cdk-bootstrap: _require-env
     @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Bootstrapping CDK for env=$ENV" "{{RESET_COLOR}}"
     @cd infra/cdk && npm install && npx cdk bootstrap -c envName=$ENV
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> CDK bootstrap complete for env=$ENV" "{{RESET_COLOR}}"
 
 # Synthesize CDK templates for an environment.
-cdk-synth: require-env
+cdk-synth: _require-env
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Synthesizing CDK templates for env=$ENV" "{{RESET_COLOR}}"
     @just build-linux-binary
     @cd infra/cdk && npm install && npx cdk synth -c envName=$ENV
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> CDK synth complete for env=$ENV" "{{RESET_COLOR}}"
 
 # Deploy all CDK stacks for an environment.
-cdk-deploy: require-env
+cdk-deploy: _require-env
     @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Deploying all CDK stacks for env=$ENV" "{{RESET_COLOR}}"
     @just build-linux-binary
     @cd infra/cdk && npm install && npx cdk deploy --all --require-approval never -c envName=$ENV
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> CDK deploy complete for env=$ENV" "{{RESET_COLOR}}"
 
 # Destroy all CDK stacks for an environment.
-cdk-undeploy: require-env
+cdk-undeploy: _require-env
     @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Destroying all CDK stacks for env=$ENV" "{{RESET_COLOR}}"
     @cd infra/cdk && npm install && npx cdk destroy --all --force -c envName=$ENV
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> CDK destroy complete for env=$ENV" "{{RESET_COLOR}}"
 
 # Deploy only the foundation stack (network/database).
-cdk-deploy-foundation app_name="accountlink": require-env
+cdk-deploy-foundation app_name="accountlink": _require-env
     @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Deploying foundation stack for app={{app_name}}, env=$ENV" "{{RESET_COLOR}}"
     @just build-linux-binary
     @cd infra/cdk && npm install && npx cdk deploy --require-approval never -c envName=$ENV -c appName={{app_name}} {{app_name}}-$ENV-foundation
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Foundation stack deploy complete" "{{RESET_COLOR}}"
 
 # Deploy only the service stack (ecs/alb/app).
-cdk-deploy-service app_name="accountlink": require-env
+cdk-deploy-service app_name="accountlink": _require-env
     @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Deploying service stack for app={{app_name}}, env=$ENV" "{{RESET_COLOR}}"
     @just build-linux-binary
     @cd infra/cdk && npm install && npx cdk deploy --require-approval never -c envName=$ENV -c appName={{app_name}} {{app_name}}-$ENV-service
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Service stack deploy complete" "{{RESET_COLOR}}"
 
 # Release flow: foundation deploy, migration, then service deploy.
-release app_name="accountlink": require-env
+release app_name="accountlink": _require-env
     @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Starting release flow for app={{app_name}}, env=$ENV" "{{RESET_COLOR}}"
     @just cdk-deploy-foundation app_name={{app_name}}
     @just flyway-migrate
