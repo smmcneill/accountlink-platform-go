@@ -2,6 +2,21 @@
 
 Go translation of `accountlink-platform` (Java/Spring/Maven).
 
+## Prerequisites
+- Go 1.25+
+- `just` (used for project scripts)
+- Docker (for container and local infra commands)
+
+Install `just`:
+```bash
+brew install just
+```
+
+On macOS/Linux with Go toolchain:
+```bash
+go install github.com/casey/just@latest
+```
+
 ## Endpoints
 - `GET /_health` -> `ok`
 - `GET /account-links/{id}`

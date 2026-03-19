@@ -59,7 +59,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			return err
 		}
 
-		checksum := int32(crc32.ChecksumIEEE(raw))
+		checksum := int64(crc32.ChecksumIEEE(raw))
 		if prevChecksum, ok := applied[m.version]; ok {
 			if prevChecksum != checksum {
 				return fmt.Errorf("checksum mismatch for migration %s (%s): db=%d file=%d", m.version, m.path, prevChecksum, checksum)
@@ -97,19 +97,19 @@ CREATE INDEX IF NOT EXISTS flyway_schema_history_s_idx ON flyway_schema_history 
 	return err
 }
 
-func loadAppliedMigrations(ctx context.Context, pool *pgxpool.Pool) (map[string]int32, error) {
+func loadAppliedMigrations(ctx context.Context, pool *pgxpool.Pool) (map[string]int64, error) {
 	rows, err := pool.Query(ctx, `SELECT version, checksum FROM flyway_schema_history WHERE success = true AND version IS NOT NULL`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	applied := make(map[string]int32)
+	applied := make(map[string]int64)
 
 	for rows.Next() {
 		var (
 			version  string
-			checksum int32
+			checksum int64
 		)
 		if err := rows.Scan(&version, &checksum); err != nil {
 			return nil, err
@@ -125,7 +125,7 @@ func loadAppliedMigrations(ctx context.Context, pool *pgxpool.Pool) (map[string]
 	return applied, nil
 }
 
-func applyMigration(ctx context.Context, pool *pgxpool.Pool, m migration, raw []byte, checksum int32) error {
+func applyMigration(ctx context.Context, pool *pgxpool.Pool, m migration, raw []byte, checksum int64) error {
 	started := time.Now()
 
 	tx, err := pool.Begin(ctx)
@@ -254,12 +254,12 @@ func parseVersionParts(version string) ([]int, error) {
 }
 
 func compareVersionParts(a, b []int) int {
-	max := len(a)
-	if len(b) > max {
-		max = len(b)
+	maxParts := len(a)
+	if len(b) > maxParts {
+		maxParts = len(b)
 	}
 
-	for i := 0; i < max; i++ {
+	for i := 0; i < maxParts; i++ {
 		av := 0
 		if i < len(a) {
 			av = a[i]
