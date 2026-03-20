@@ -41,7 +41,6 @@ flowchart TB
                 PrivB["PrivateSubnet2<br/>us-east-1b"]
 
                 TaskA["Fargate Task<br/>App :8080"]
-                TaskB["Fargate Task<br/>App :8080"]
             end
 
             %% Data
@@ -79,12 +78,10 @@ flowchart TB
     ALB --> Listener
     Listener --> TG
     TG --> TaskA
-    TG --> TaskB
 
     %% Security relationships
     AlbSg -.-> ALB
     ServiceSg -.-> TaskA
-    ServiceSg -.-> TaskB
     AlbSg -->|"allow :8080"| ServiceSg
     ServiceSg -->|"allow :5432"| DbSg
     DbSg -.-> Aurora
@@ -92,7 +89,6 @@ flowchart TB
     %% ECS relationships
     Cluster --> TaskDef
     TaskDef --> TaskA
-    TaskDef --> TaskB
 
     %% Runtime dependencies
     ExecRole --> Image
@@ -103,13 +99,10 @@ flowchart TB
     TaskRole --> EventTopic
 
     TaskA -->|"read secret"| DbSecret
-    TaskB -->|"read secret"| DbSecret
 
     TaskA -->|"Postgres :5432"| Aurora
-    TaskB -->|"Postgres :5432"| Aurora
 
     TaskA -->|"publish"| EventTopic
-    TaskB -->|"publish"| EventTopic
 
     %% Data layer
     DbSubnetGroup --> Aurora
@@ -117,7 +110,6 @@ flowchart TB
 
     %% Egress
     NAT -->|"outbound internet"| TaskA
-    NAT -->|"outbound internet"| TaskB
 ```
 
 ## What this CDK app creates
