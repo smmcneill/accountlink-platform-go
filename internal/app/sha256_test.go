@@ -4,29 +4,50 @@ import (
 	"testing"
 )
 
-func TestSHA256Hex_Stable(t *testing.T) {
-	input := "user-123|Chase"
-
-	a := sha256Hex(input)
-	b := sha256Hex(input)
-
-	if a != b {
-		t.Fatalf("expected deterministic output, got %q and %q", a, b)
+func TestSHA256Hex(t *testing.T) {
+	tests := map[string]struct {
+		inputA   string
+		inputB   string
+		validate func(t *testing.T, outputA string, outputB string)
+	}{
+		"stable": {
+			inputA: "user-123|Chase",
+			inputB: "user-123|Chase",
+			validate: func(t *testing.T, outputA string, outputB string) {
+				t.Helper()
+				if outputA != outputB {
+					t.Fatalf("expected deterministic output, got %q and %q", outputA, outputB)
+				}
+			},
+		},
+		"changes with input": {
+			inputA: "user-123|Chase",
+			inputB: "user-999|Chase",
+			validate: func(t *testing.T, outputA string, outputB string) {
+				t.Helper()
+				if outputA == outputB {
+					t.Fatalf("expected different hashes for different inputs")
+				}
+			},
+		},
+		"has expected length": {
+			inputA: "abc",
+			inputB: "",
+			validate: func(t *testing.T, outputA string, outputB string) {
+				t.Helper()
+				_ = outputB
+				if len(outputA) != 64 {
+					t.Fatalf("expected sha256 hex length 64, got %d", len(outputA))
+				}
+			},
+		},
 	}
-}
 
-func TestSHA256Hex_ChangesWithInput(t *testing.T) {
-	a := sha256Hex("user-123|Chase")
-	b := sha256Hex("user-999|Chase")
-
-	if a == b {
-		t.Fatalf("expected different hashes for different inputs")
-	}
-}
-
-func TestSHA256Hex_HasExpectedLength(t *testing.T) {
-	got := sha256Hex("abc")
-	if len(got) != 64 {
-		t.Fatalf("expected sha256 hex length 64, got %d", len(got))
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			outputA := sha256Hex(tc.inputA)
+			outputB := sha256Hex(tc.inputB)
+			tc.validate(t, outputA, outputB)
+		})
 	}
 }
