@@ -14,6 +14,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/kelseyhightower/envconfig v1.4.0
+	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.6.0
 )
 

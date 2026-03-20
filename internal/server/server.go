@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -84,13 +83,13 @@ func enforceMethod(method string, next http.HandlerFunc, logger *slog.Logger) ht
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 1) // TODO: Should see a leak if channel not buffered
 
 	go func() {
 		s.logger.Info("server_starting", "addr", s.httpServer.Addr)
 
 		err := s.httpServer.ListenAndServe()
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err != nil {
 			errCh <- err
 		}
 	}()

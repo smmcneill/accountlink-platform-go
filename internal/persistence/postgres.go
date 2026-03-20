@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"accountlink-platform-go/internal/domain"
+	"accountlink-platform-go/internal/app"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -51,7 +51,7 @@ func NewTxManager(pool *pgxpool.Pool) *TxManager {
 	return &TxManager{pool: pool}
 }
 
-func (m *TxManager) Begin(ctx context.Context) (domain.Tx, error) {
+func (m *TxManager) Begin(ctx context.Context) (app.Tx, error) {
 	tx, err := m.pool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func (m *TxManager) Begin(ctx context.Context) (domain.Tx, error) {
 	return &PostgresTx{tx: tx}, nil
 }
 
-func unwrapTx(tx domain.Tx) pgx.Tx {
+func unwrapTx(tx app.Tx) pgx.Tx {
 	pgtx, ok := tx.(*PostgresTx)
 	if !ok || pgtx.tx == nil {
 		panic(fmt.Sprintf("unexpected tx type %T", tx))

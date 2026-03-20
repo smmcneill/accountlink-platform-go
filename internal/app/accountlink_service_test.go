@@ -2,27 +2,33 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"accountlink-platform-go/internal/domain"
-	domainmocks "accountlink-platform-go/internal/domain/mocks"
 
 	"github.com/google/uuid"
 	"go.uber.org/mock/gomock"
 )
 
+func testSHA256Hex(v string) string {
+	sum := sha256.Sum256([]byte(v))
+	return hex.EncodeToString(sum[:])
+}
+
 func TestCreateWithSameKeySamePayloadReturnsSameResource(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	fixedNow := time.Date(2026, 4, 18, 0, 0, 0, 0, time.UTC)
 	createdID := uuid.New()
@@ -32,14 +38,14 @@ func TestCreateWithSameKeySamePayloadReturnsSameResource(t *testing.T) {
 		ExternalInstitution: "Chase",
 		Status:              domain.LinkStatusPending,
 	}
-	requestHash := sha256Hex("user-123|Chase")
+	requestHash := testSHA256Hex("user-123|Chase")
 
 	gomock.InOrder(
 		idem.EXPECT().FindByKey(gomock.Any(), "idem-1").Return(domain.IdempotencyRecord{}, false, nil),
 		txManager.EXPECT().Begin(gomock.Any()).Return(tx, nil),
 		repo.EXPECT().Save(gomock.Any(), tx, gomock.Any()).Return(created, nil),
 		idem.EXPECT().TryInsert(gomock.Any(), tx, gomock.AssignableToTypeOf(domain.IdempotencyRecord{})).
-			DoAndReturn(func(_ context.Context, _ domain.Tx, rec domain.IdempotencyRecord) (bool, error) {
+			DoAndReturn(func(_ context.Context, _ Tx, rec domain.IdempotencyRecord) (bool, error) {
 				if rec.Key != "idem-1" || rec.RequestHash != requestHash || rec.AccountLinkID != createdID {
 					t.Fatalf("unexpected idempotency record: %+v", rec)
 				}
@@ -47,7 +53,7 @@ func TestCreateWithSameKeySamePayloadReturnsSameResource(t *testing.T) {
 				return true, nil
 			}),
 		outbox.EXPECT().Add(gomock.Any(), tx, gomock.AssignableToTypeOf(domain.OutboxEvent{})).
-			DoAndReturn(func(_ context.Context, _ domain.Tx, event domain.OutboxEvent) error {
+			DoAndReturn(func(_ context.Context, _ Tx, event domain.OutboxEvent) error {
 				if event.CreatedAt != fixedNow {
 					t.Fatalf("unexpected event timestamp: got %v want %v", event.CreatedAt, fixedNow)
 				}
@@ -64,8 +70,13 @@ func TestCreateWithSameKeySamePayloadReturnsSameResource(t *testing.T) {
 		repo.EXPECT().FindByID(gomock.Any(), createdID).Return(created, true, nil),
 	)
 
-	svc := NewAccountLinkService(txManager, repo, idem, outbox)
-	svc.now = func() time.Time { return fixedNow }
+	svc := NewAccountLinkService(
+		txManager,
+		repo,
+		idem,
+		outbox,
+		WithAccountLinkServiceNow(func() time.Time { return fixedNow }),
+	)
 
 	r1, err := svc.Create(context.Background(), "idem-1", "user-123", "Chase")
 	if err != nil {
@@ -94,11 +105,11 @@ func TestCreateWithSameKeyDifferentPayloadReturnsConflict(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	createdID := uuid.New()
 	created := domain.AccountLink{
@@ -107,7 +118,7 @@ func TestCreateWithSameKeyDifferentPayloadReturnsConflict(t *testing.T) {
 		ExternalInstitution: "Chase",
 		Status:              domain.LinkStatusPending,
 	}
-	initialHash := sha256Hex("user-123|Chase")
+	initialHash := testSHA256Hex("user-123|Chase")
 
 	gomock.InOrder(
 		idem.EXPECT().FindByKey(gomock.Any(), "idem-2").Return(domain.IdempotencyRecord{}, false, nil),
@@ -141,10 +152,10 @@ func TestGetByIDReturnsNotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	targetID := uuid.New()
 
@@ -161,10 +172,10 @@ func TestGetByIDPropagatesRepositoryError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	targetID := uuid.New()
 	expectedErr := fmt.Errorf("db down")
@@ -182,11 +193,11 @@ func TestCreateWithNoIdempotencyKeyUsesNonIdempotentPath(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	created := domain.AccountLink{
 		ID:                  uuid.New(),
@@ -204,8 +215,13 @@ func TestCreateWithNoIdempotencyKeyUsesNonIdempotentPath(t *testing.T) {
 		tx.EXPECT().Rollback(gomock.Any()).Return(nil),
 	)
 
-	svc := NewAccountLinkService(txManager, repo, idem, outbox)
-	svc.now = func() time.Time { return publishedAt }
+	svc := NewAccountLinkService(
+		txManager,
+		repo,
+		idem,
+		outbox,
+		WithAccountLinkServiceNow(func() time.Time { return publishedAt }),
+	)
 	_, err := svc.Create(context.Background(), "", "user-123", "Chase")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -216,10 +232,10 @@ func TestCreateReturnsErrorFromIdempotencyLookup(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	lookupErr := fmt.Errorf("lookup failed")
 	idem.EXPECT().FindByKey(gomock.Any(), "idem-3").Return(domain.IdempotencyRecord{}, false, lookupErr)
@@ -235,14 +251,14 @@ func TestCreateBeginsTransactionAfterSuccessfulIdempotencyLookup(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	idem.EXPECT().FindByKey(gomock.Any(), "idem-4").Return(domain.IdempotencyRecord{}, false, nil)
 	beginErr := fmt.Errorf("begin failed")
-	txManager.EXPECT().Begin(gomock.Any()).Return((*domainmocks.MockTx)(nil), beginErr)
+	txManager.EXPECT().Begin(gomock.Any()).Return((*MockTx)(nil), beginErr)
 
 	svc := NewAccountLinkService(txManager, repo, idem, outbox)
 	_, err := svc.Create(context.Background(), "idem-4", "user-123", "Chase")
@@ -255,11 +271,11 @@ func TestCreateReturnsErrorWhenSavingAccountLinkFails(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	gomock.InOrder(
 		idem.EXPECT().FindByKey(gomock.Any(), "idem-5").Return(domain.IdempotencyRecord{}, false, nil),
@@ -279,11 +295,11 @@ func TestCreateReturnsErrorWhenIdempotencyInsertFails(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	created := domain.AccountLink{
 		ID:                  uuid.New(),
@@ -311,11 +327,11 @@ func TestCreateReturnsErrorWhenInsertLostCommitFails(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	created := domain.AccountLink{
 		ID:                  uuid.New(),
@@ -346,11 +362,11 @@ func TestCreateReturnsErrorWhenInsertLostReplayLookupFails(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	created := domain.AccountLink{
 		ID:                  uuid.New(),
@@ -382,11 +398,11 @@ func TestCreateReturnsErrorWhenOutboxWriteFails(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	created := domain.AccountLink{
 		ID:                  uuid.New(),
@@ -394,14 +410,14 @@ func TestCreateReturnsErrorWhenOutboxWriteFails(t *testing.T) {
 		ExternalInstitution: "Chase",
 		Status:              domain.LinkStatusPending,
 	}
-	requestHash := sha256Hex("user-123|Chase")
+	requestHash := testSHA256Hex("user-123|Chase")
 
 	gomock.InOrder(
 		idem.EXPECT().FindByKey(gomock.Any(), "idem-7").Return(domain.IdempotencyRecord{}, false, nil),
 		txManager.EXPECT().Begin(gomock.Any()).Return(tx, nil),
 		repo.EXPECT().Save(gomock.Any(), tx, gomock.Any()).Return(created, nil),
 		idem.EXPECT().TryInsert(gomock.Any(), tx, gomock.Any()).
-			DoAndReturn(func(_ context.Context, _ domain.Tx, rec domain.IdempotencyRecord) (bool, error) {
+			DoAndReturn(func(_ context.Context, _ Tx, rec domain.IdempotencyRecord) (bool, error) {
 				if rec.Key != "idem-7" || rec.RequestHash != requestHash || rec.AccountLinkID != created.ID {
 					t.Fatalf("unexpected record: %+v", rec)
 				}
@@ -422,13 +438,13 @@ func TestCreateNonIdempotentReturnsErrorWhenTransactionBeginFails(t *testing.T) 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	beginErr := fmt.Errorf("begin failed")
-	txManager.EXPECT().Begin(gomock.Any()).Return((*domainmocks.MockTx)(nil), beginErr)
+	txManager.EXPECT().Begin(gomock.Any()).Return((*MockTx)(nil), beginErr)
 
 	svc := NewAccountLinkService(txManager, repo, idem, outbox)
 	_, err := svc.Create(context.Background(), "", "user-123", "Chase")
@@ -441,11 +457,11 @@ func TestCreateNonIdempotentReturnsErrorWhenInputInvalid(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	txManager.EXPECT().Begin(gomock.Any()).Return(tx, nil)
 	tx.EXPECT().Rollback(gomock.Any()).Return(nil)
@@ -461,11 +477,11 @@ func TestCreateNonIdempotentReturnsErrorWhenOutboxWriteFails(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	created := domain.AccountLink{
 		ID:                  uuid.New(),
@@ -493,11 +509,11 @@ func TestCreateNonIdempotentReturnsErrorWhenCommitFails(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	created := domain.AccountLink{
 		ID:                  uuid.New(),
@@ -526,11 +542,11 @@ func TestCreateNonIdempotentReturnsErrorWhenMarshalOutboxPayloadFails(t *testing
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	created := domain.AccountLink{
 		ID:                  uuid.New(),
@@ -546,8 +562,13 @@ func TestCreateNonIdempotentReturnsErrorWhenMarshalOutboxPayloadFails(t *testing
 		tx.EXPECT().Rollback(gomock.Any()).Return(nil),
 	)
 
-	svc := NewAccountLinkService(txManager, repo, idem, outbox)
-	svc.marshal = func(_ interface{}) ([]byte, error) { return nil, marshalErr }
+	svc := NewAccountLinkService(
+		txManager,
+		repo,
+		idem,
+		outbox,
+		WithAccountLinkServiceMarshal(func(_ interface{}) ([]byte, error) { return nil, marshalErr }),
+	)
 
 	_, err := svc.Create(context.Background(), "", "user-123", "Chase")
 	if !errors.Is(err, marshalErr) {
@@ -559,11 +580,11 @@ func TestCreateReturnsErrorWhenInsertedCommitFails(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	tx := domainmocks.NewMockTx(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	tx := NewMockTx(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	created := domain.AccountLink{
 		ID:                  uuid.New(),
@@ -593,19 +614,19 @@ func TestCreateReturnsErrorWhenReplayingRecordIsMissing(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	createdID := uuid.New()
-	requestHash := sha256Hex("user-123|Chase")
+	requestHash := testSHA256Hex("user-123|Chase")
 	rec := domain.IdempotencyRecord{
 		Key:           "idem-9",
 		RequestHash:   requestHash,
 		AccountLinkID: createdID,
 	}
-	tx := domainmocks.NewMockTx(ctrl)
+	tx := NewMockTx(ctrl)
 
 	gomock.InOrder(
 		idem.EXPECT().FindByKey(gomock.Any(), "idem-9").Return(domain.IdempotencyRecord{}, false, nil),
@@ -618,7 +639,7 @@ func TestCreateReturnsErrorWhenReplayingRecordIsMissing(t *testing.T) {
 			Status:              domain.LinkStatusPending,
 		}, nil),
 		idem.EXPECT().TryInsert(gomock.Any(), tx, gomock.Any()).
-			DoAndReturn(func(_ context.Context, _ domain.Tx, got domain.IdempotencyRecord) (bool, error) {
+			DoAndReturn(func(_ context.Context, _ Tx, got domain.IdempotencyRecord) (bool, error) {
 				if got.Key != rec.Key || got.RequestHash != rec.RequestHash || got.AccountLinkID != rec.AccountLinkID {
 					t.Fatalf("unexpected record: %+v", got)
 				}
@@ -644,14 +665,14 @@ func TestReplayReturnsErrorWhenAccountLinkMissing(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	rec := domain.IdempotencyRecord{
 		Key:           "idem-10",
-		RequestHash:   sha256Hex("user-123|Chase"),
+		RequestHash:   testSHA256Hex("user-123|Chase"),
 		AccountLinkID: uuid.New(),
 	}
 
@@ -669,14 +690,14 @@ func TestReplayReturnsErrorWhenFindByIDFails(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	txManager := domainmocks.NewMockTxManager(ctrl)
-	repo := domainmocks.NewMockAccountLinkRepository(ctrl)
-	idem := domainmocks.NewMockIdempotencyRepository(ctrl)
-	outbox := domainmocks.NewMockOutboxRepository(ctrl)
+	txManager := NewMockTxManager(ctrl)
+	repo := NewMockAccountLinkRepository(ctrl)
+	idem := NewMockIdempotencyRepository(ctrl)
+	outbox := NewMockOutboxRepository(ctrl)
 
 	rec := domain.IdempotencyRecord{
 		Key:           "idem-13",
-		RequestHash:   sha256Hex("user-123|Chase"),
+		RequestHash:   testSHA256Hex("user-123|Chase"),
 		AccountLinkID: uuid.New(),
 	}
 	findErr := fmt.Errorf("repo read failed")

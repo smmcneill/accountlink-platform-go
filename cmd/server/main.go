@@ -13,7 +13,6 @@ import (
 	"accountlink-platform-go/internal/app"
 	"accountlink-platform-go/internal/config"
 	"accountlink-platform-go/internal/db"
-	"accountlink-platform-go/internal/domain"
 	"accountlink-platform-go/internal/events"
 	"accountlink-platform-go/internal/persistence"
 	"accountlink-platform-go/internal/server"
@@ -83,7 +82,7 @@ func run() error {
 	return httpServer.Run(ctx)
 }
 
-func buildPublisher(ctx context.Context, cfg config.Config, logger *slog.Logger) (domain.EventPublisher, error) {
+func buildPublisher(ctx context.Context, cfg config.Config, logger *slog.Logger) (app.EventPublisher, error) {
 	if cfg.EventTarget != "sns" {
 		return events.NewLoggingPublisher(logger), nil
 	}

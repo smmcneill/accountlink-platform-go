@@ -346,7 +346,7 @@ type (
 func (apiFakeTx) Commit(context.Context) error   { return nil }
 func (apiFakeTx) Rollback(context.Context) error { return nil }
 
-func (apiFakeTxManager) Begin(context.Context) (domain.Tx, error) { return apiFakeTx{}, nil }
+func (apiFakeTxManager) Begin(context.Context) (app.Tx, error) { return apiFakeTx{}, nil }
 
 func newAPIFakeRepo() *apiFakeRepo { return &apiFakeRepo{links: map[uuid.UUID]domain.AccountLink{}} }
 
@@ -358,7 +358,8 @@ func (r *apiFakeRepo) FindByID(_ context.Context, id uuid.UUID) (domain.AccountL
 
 	return v, ok, nil
 }
-func (r *apiFakeRepo) Save(_ context.Context, _ domain.Tx, link domain.AccountLink) (domain.AccountLink, error) {
+
+func (r *apiFakeRepo) Save(_ context.Context, _ app.Tx, link domain.AccountLink) (domain.AccountLink, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -372,7 +373,8 @@ type apiFakeGetByIDErrRepo struct{}
 func (r *apiFakeGetByIDErrRepo) FindByID(_ context.Context, _ uuid.UUID) (domain.AccountLink, bool, error) {
 	return domain.AccountLink{}, false, errors.New("db failure")
 }
-func (r *apiFakeGetByIDErrRepo) Save(_ context.Context, _ domain.Tx, _ domain.AccountLink) (domain.AccountLink, error) {
+
+func (r *apiFakeGetByIDErrRepo) Save(_ context.Context, _ app.Tx, _ domain.AccountLink) (domain.AccountLink, error) {
 	return domain.AccountLink{}, nil
 }
 
@@ -389,7 +391,7 @@ func (i *apiFakeIdem) FindByKey(_ context.Context, key string) (domain.Idempoten
 	return r, ok, nil
 }
 
-func (i *apiFakeIdem) TryInsert(_ context.Context, _ domain.Tx, rec domain.IdempotencyRecord) (bool, error) {
+func (i *apiFakeIdem) TryInsert(_ context.Context, _ app.Tx, rec domain.IdempotencyRecord) (bool, error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
@@ -411,28 +413,31 @@ func (apiFakeConflictIdem) FindByKey(_ context.Context, _ string) (domain.Idempo
 		AccountLinkID: uuid.New(),
 	}, true, nil
 }
-func (apiFakeConflictIdem) TryInsert(_ context.Context, _ domain.Tx, _ domain.IdempotencyRecord) (bool, error) {
+
+func (apiFakeConflictIdem) TryInsert(_ context.Context, _ app.Tx, _ domain.IdempotencyRecord) (bool, error) {
 	return false, nil
 }
 
-func (*apiFakeOutbox) Add(context.Context, domain.Tx, domain.OutboxEvent) error { return nil }
-func (*apiFakeOutbox) FindUnpublishedForUpdateSkipLocked(context.Context, domain.Tx, int) ([]domain.OutboxEvent, error) {
+func (*apiFakeOutbox) Add(context.Context, app.Tx, domain.OutboxEvent) error { return nil }
+
+func (*apiFakeOutbox) FindUnpublishedForUpdateSkipLocked(context.Context, app.Tx, int) ([]domain.OutboxEvent, error) {
 	return nil, nil
 }
-func (*apiFakeOutbox) MarkPublished(context.Context, domain.Tx, uuid.UUID, time.Time) error {
+
+func (*apiFakeOutbox) MarkPublished(context.Context, app.Tx, uuid.UUID, time.Time) error {
 	return nil
 }
 
 type apiFakeOutboxAddErr struct{}
 
-func (apiFakeOutboxAddErr) Add(context.Context, domain.Tx, domain.OutboxEvent) error {
+func (apiFakeOutboxAddErr) Add(context.Context, app.Tx, domain.OutboxEvent) error {
 	return errors.New("outbox failure")
 }
 
-func (apiFakeOutboxAddErr) FindUnpublishedForUpdateSkipLocked(context.Context, domain.Tx, int) ([]domain.OutboxEvent, error) {
+func (apiFakeOutboxAddErr) FindUnpublishedForUpdateSkipLocked(context.Context, app.Tx, int) ([]domain.OutboxEvent, error) {
 	return nil, nil
 }
 
-func (apiFakeOutboxAddErr) MarkPublished(context.Context, domain.Tx, uuid.UUID, time.Time) error {
+func (apiFakeOutboxAddErr) MarkPublished(context.Context, app.Tx, uuid.UUID, time.Time) error {
 	return nil
 }

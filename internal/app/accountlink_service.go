@@ -21,10 +21,10 @@ var (
 
 type (
 	AccountLinkService struct {
-		txManager domain.TxManager
-		repo      domain.AccountLinkRepository
-		idem      domain.IdempotencyRepository
-		outbox    domain.OutboxRepository
+		txManager TxManager
+		repo      AccountLinkRepository
+		idem      IdempotencyRepository
+		outbox    OutboxRepository
 		now       func() time.Time
 		marshal   func(interface{}) ([]byte, error)
 	}
@@ -40,23 +40,48 @@ type (
 		ExternalInstitution string    `json:"externalInstitution"`
 		Status              string    `json:"status"`
 	}
+
+	AccountLinkServiceOption func(*AccountLinkService)
 )
 
 func UTCNow() time.Time { return time.Now().UTC() }
 
 func NewAccountLinkService(
-	txManager domain.TxManager,
-	repo domain.AccountLinkRepository,
-	idem domain.IdempotencyRepository,
-	outbox domain.OutboxRepository,
+	txManager TxManager,
+	repo AccountLinkRepository,
+	idem IdempotencyRepository,
+	outbox OutboxRepository,
+	opts ...AccountLinkServiceOption,
 ) *AccountLinkService {
-	return &AccountLinkService{
+	svc := &AccountLinkService{
 		txManager: txManager,
 		repo:      repo,
 		idem:      idem,
 		outbox:    outbox,
 		now:       UTCNow,
 		marshal:   json.Marshal,
+	}
+
+	for _, opt := range opts {
+		opt(svc)
+	}
+
+	return svc
+}
+
+func WithAccountLinkServiceNow(now func() time.Time) AccountLinkServiceOption {
+	return func(svc *AccountLinkService) {
+		if now != nil {
+			svc.now = now
+		}
+	}
+}
+
+func WithAccountLinkServiceMarshal(marshal func(interface{}) ([]byte, error)) AccountLinkServiceOption {
+	return func(svc *AccountLinkService) {
+		if marshal != nil {
+			svc.marshal = marshal
+		}
 	}
 }
 
@@ -183,7 +208,7 @@ func (s *AccountLinkService) replay(ctx context.Context, rec domain.IdempotencyR
 	return CreateAccountLinkResult{Link: link, Created: false}, nil
 }
 
-func (s *AccountLinkService) createNew(ctx context.Context, tx domain.Tx, userID, externalInstitution string) (domain.AccountLink, error) {
+func (s *AccountLinkService) createNew(ctx context.Context, tx Tx, userID, externalInstitution string) (domain.AccountLink, error) {
 	link, err := domain.NewAccountLink(uuid.New(), userID, externalInstitution, domain.LinkStatusPending)
 	if err != nil {
 		return domain.AccountLink{}, err
@@ -192,7 +217,7 @@ func (s *AccountLinkService) createNew(ctx context.Context, tx domain.Tx, userID
 	return s.repo.Save(ctx, tx, link)
 }
 
-func (s *AccountLinkService) writeAccountLinkCreatedOutbox(ctx context.Context, tx domain.Tx, link domain.AccountLink) error {
+func (s *AccountLinkService) writeAccountLinkCreatedOutbox(ctx context.Context, tx Tx, link domain.AccountLink) error {
 	payload, err := s.marshal(accountLinkCreatedPayload{
 		ID:                  link.ID,
 		UserID:              link.UserID,

@@ -11,9 +11,9 @@ import (
 
 type (
 	OutboxProcessor struct {
-		txManager domain.TxManager
-		outbox    domain.OutboxRepository
-		publisher domain.EventPublisher
+		txManager TxManager
+		outbox    OutboxRepository
+		publisher EventPublisher
 		now       func() time.Time
 		batchSize int
 		pollDelay time.Duration
@@ -50,9 +50,9 @@ func WithOutboxProcessorNow(now func() time.Time) OutboxProcessorOption {
 }
 
 func NewOutboxProcessor(
-	txManager domain.TxManager,
-	outbox domain.OutboxRepository,
-	publisher domain.EventPublisher,
+	txManager TxManager,
+	outbox OutboxRepository,
+	publisher EventPublisher,
 	opts ...OutboxProcessorOption,
 ) *OutboxProcessor {
 	p := &OutboxProcessor{

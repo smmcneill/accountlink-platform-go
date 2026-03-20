@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 
+	"accountlink-platform-go/internal/app"
 	"accountlink-platform-go/internal/domain"
 
 	"github.com/jackc/pgx/v5"
@@ -35,7 +36,7 @@ WHERE idem_key = $1`
 	return rec, true, nil
 }
 
-func (s *IdempotencyStore) TryInsert(ctx context.Context, tx domain.Tx, rec domain.IdempotencyRecord) (bool, error) {
+func (s *IdempotencyStore) TryInsert(ctx context.Context, tx app.Tx, rec domain.IdempotencyRecord) (bool, error) {
 	const q = `
 INSERT INTO idempotency_keys (idem_key, request_hash, account_link_id)
 VALUES ($1, $2, $3)

@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"testing"
@@ -7,5 +7,6 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	// Ensure background goroutines from processor loop tests are not left running.
 	goleak.VerifyTestMain(m)
 }

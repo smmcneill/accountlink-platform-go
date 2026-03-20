@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"accountlink-platform-go/internal/app"
 	"accountlink-platform-go/internal/domain"
 
 	"github.com/google/uuid"
@@ -15,7 +16,7 @@ func NewOutboxStore() *OutboxStore {
 	return new(OutboxStore)
 }
 
-func (s *OutboxStore) Add(ctx context.Context, tx domain.Tx, event domain.OutboxEvent) error {
+func (s *OutboxStore) Add(ctx context.Context, tx app.Tx, event domain.OutboxEvent) error {
 	const q = `
 INSERT INTO outbox_events (id, event_type, aggregate_type, aggregate_id, payload, created_at, published_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7)`
@@ -35,7 +36,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7)`
 	return err
 }
 
-func (s *OutboxStore) FindUnpublishedForUpdateSkipLocked(ctx context.Context, tx domain.Tx, batchSize int) ([]domain.OutboxEvent, error) {
+func (s *OutboxStore) FindUnpublishedForUpdateSkipLocked(ctx context.Context, tx app.Tx, batchSize int) ([]domain.OutboxEvent, error) {
 	const q = `
 SELECT id, event_type, aggregate_type, aggregate_id, payload, created_at, published_at
 FROM outbox_events
@@ -76,7 +77,7 @@ FOR UPDATE SKIP LOCKED`
 	return out, nil
 }
 
-func (s *OutboxStore) MarkPublished(ctx context.Context, tx domain.Tx, id uuid.UUID, publishedAt time.Time) error {
+func (s *OutboxStore) MarkPublished(ctx context.Context, tx app.Tx, id uuid.UUID, publishedAt time.Time) error {
 	const q = `UPDATE outbox_events SET published_at = $2 WHERE id = $1`
 
 	_, err := unwrapTx(tx).Exec(ctx, q, id, publishedAt)
