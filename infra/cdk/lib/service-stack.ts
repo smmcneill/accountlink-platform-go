@@ -1,6 +1,7 @@
 import {
   CfnOutput,
   Duration,
+  RemovalPolicy,
   Stack,
   StackProps
 } from "aws-cdk-lib";
@@ -42,7 +43,8 @@ export class ServiceStack extends Stack {
 
     const logGroup = new logs.LogGroup(this, "AppLogs", {
       logGroupName: `/ecs/${props.appName}-${props.envName}`,
-      retention: logs.RetentionDays.ONE_MONTH
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: RemovalPolicy.DESTROY
     });
 
     const container = taskDefinition.addContainer("App", {
