@@ -54,3 +54,23 @@ func TestNewAccountLink_RequiresStatus(t *testing.T) {
 		t.Fatalf("expected error for blank status")
 	}
 }
+
+func TestNewAccountLink_RejectsUnknownStatus(t *testing.T) {
+	_, err := NewAccountLink(uuid.New(), "user-123", "Chase", LinkStatus("UNKNOWN"))
+	if err == nil {
+		t.Fatalf("expected error for unknown status")
+	}
+}
+
+func TestAccountLink_Validate_RejectsUnknownStatus(t *testing.T) {
+	link := AccountLink{
+		ID:                  uuid.New(),
+		UserID:              "user-123",
+		ExternalInstitution: "Chase",
+		Status:              LinkStatus("UNKNOWN"),
+	}
+
+	if err := link.Validate(); err == nil {
+		t.Fatalf("expected error for unknown status")
+	}
+}

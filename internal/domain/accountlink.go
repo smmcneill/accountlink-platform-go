@@ -23,22 +23,44 @@ const (
 	LinkStatusFailed  LinkStatus = "FAILED"
 )
 
+func (s LinkStatus) IsValid() bool {
+	switch s {
+	case LinkStatusPending, LinkStatusActive, LinkStatusFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+func (a AccountLink) Validate() error {
+	if a.ID == uuid.Nil {
+		return errors.New("id must not be nil")
+	}
+
+	if a.UserID == "" {
+		return errors.New("userId must not be blank")
+	}
+
+	if a.ExternalInstitution == "" {
+		return errors.New("externalInstitution must not be blank")
+	}
+
+	if !a.Status.IsValid() {
+		return errors.New("status must be one of: PENDING, ACTIVE, FAILED")
+	}
+
+	return nil
+}
+
 func NewAccountLink(id uuid.UUID, userID, externalInstitution string, status LinkStatus) (AccountLink, error) {
-	if id == uuid.Nil {
-		return AccountLink{}, errors.New("id must not be nil")
+	link := AccountLink{
+		ID:                  id,
+		UserID:              userID,
+		ExternalInstitution: externalInstitution,
+		Status:              status,
 	}
-
-	if userID == "" {
-		return AccountLink{}, errors.New("userId must not be blank")
+	if err := link.Validate(); err != nil {
+		return AccountLink{}, err
 	}
-
-	if externalInstitution == "" {
-		return AccountLink{}, errors.New("externalInstitution must not be blank")
-	}
-
-	if status == "" {
-		return AccountLink{}, errors.New("status must not be blank")
-	}
-
-	return AccountLink{ID: id, UserID: userID, ExternalInstitution: externalInstitution, Status: status}, nil
+	return link, nil
 }

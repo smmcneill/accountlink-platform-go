@@ -48,6 +48,10 @@ WHERE id = $1`
 }
 
 func (s *AccountLinkStore) Save(ctx context.Context, tx app.Tx, link domain.AccountLink) (domain.AccountLink, error) {
+	if err := link.Validate(); err != nil {
+		return domain.AccountLink{}, err
+	}
+
 	const q = `
 INSERT INTO account_links (id, user_id, external_institution, status)
 VALUES ($1, $2, $3, $4)
