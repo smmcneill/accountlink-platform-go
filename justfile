@@ -187,3 +187,15 @@ image-build tag="accountlink-platform-go:latest" platform="linux/amd64":
     @just build-linux-binary platform={{platform}}
     @docker build --platform {{platform}} -t {{tag}} .
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Container image build complete: {{tag}}" "{{RESET_COLOR}}"
+
+# Start a dockerized OpenAPI editor (Swagger Editor UI).
+openapi-editor port="8080":
+    @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Starting OpenAPI editor on http://localhost:{{port}}" "{{RESET_COLOR}}"
+    @docker rm -f openapi-editor >/dev/null 2>&1 || true
+    @docker run --rm --name openapi-editor -p {{port}}:8080 swaggerapi/swagger-editor
+
+# Start AsyncAPI Studio in Docker.
+asyncapi-studio port="3000":
+    @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Starting AsyncAPI Studio on http://localhost:{{port}}" "{{RESET_COLOR}}"
+    @docker rm -f asyncapi-studio >/dev/null 2>&1 || true
+    @docker run --rm --name asyncapi-studio -p {{port}}:80 asyncapi/studio
