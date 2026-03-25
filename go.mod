@@ -10,8 +10,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sns v1.39.12
 	github.com/aws/constructs-go/constructs/v10 v10.5.1
 	github.com/aws/jsii-runtime-go v1.127.0
+	github.com/failsafe-go/failsafe-go v0.9.1
 	github.com/google/uuid v1.6.0
-	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/kelseyhightower/envconfig v1.4.0
 	go.uber.org/goleak v1.3.0
@@ -31,11 +31,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.9 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.1 // indirect
 	github.com/aws/smithy-go v1.24.1 // indirect
+	github.com/bits-and-blooms/bitset v1.24.0 // indirect
 	github.com/cdklabs/awscdk-asset-awscli-go/awscliv1/v2 v2.2.263 // indirect
 	github.com/cdklabs/awscdk-asset-node-proxy-agent-go/nodeproxyagentv6/v2 v2.1.1 // indirect
 	github.com/cdklabs/cloud-assembly-schema-go/awscdkcloudassemblyschema/v52 v52.2.0 // indirect
 	github.com/fatih/color v1.18.0 // indirect
-	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
