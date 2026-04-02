@@ -34,11 +34,12 @@ setup:
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew update
     @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Upgrading installed Homebrew packages" "{{RESET_COLOR}}"
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew upgrade
-    @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Installing go, golangci-lint, flyway, and node" "{{RESET_COLOR}}"
+    @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Installing go, golangci-lint, flyway, node, and pre-commit" "{{RESET_COLOR}}"
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew install go
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew install golangci-lint
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew install flyway
     @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew install node
+    @HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_ENV_HINTS=1 brew install pre-commit
     @printf "%b%s%b\n" "{{WARN_COLOR}}" "==> Installing Go mutation testing tool" "{{RESET_COLOR}}"
     @go install github.com/avito-tech/go-mutesting/cmd/go-mutesting@latest
     @printf "%b%s%b\n" "{{INFO_COLOR}}" "==> Setup complete" "{{RESET_COLOR}}"

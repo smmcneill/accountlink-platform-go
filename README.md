@@ -6,6 +6,7 @@ Go translation of `accountlink-platform` (Java/Spring/Maven).
 - Go 1.25+
 - `just` (used for project scripts)
 - Docker (for container and local infra commands)
+- `pre-commit` (optional, for local commit-time checks)
 
 Install `just`:
 ```bash
@@ -15,6 +16,16 @@ brew install just
 On macOS/Linux with Go toolchain:
 ```bash
 go install github.com/casey/just@latest
+```
+
+Install `pre-commit`:
+```bash
+brew install pre-commit
+```
+
+Enable hooks in this repo:
+```bash
+pre-commit install
 ```
 
 ## Endpoints

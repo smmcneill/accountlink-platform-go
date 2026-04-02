@@ -1,0 +1,26 @@
+repos:
+  - repo: local
+    hooks:
+      - id: go-fmt
+        name: go fmt
+        entry: just fmt
+        language: system
+        pass_filenames: false
+
+      - id: go-lint
+        name: go lint
+        entry: just lint
+        language: system
+        pass_filenames: false
+
+      - id: go-tests
+        name: go tests
+        entry: go test ./cmd/... ./internal/...
+        language: system
+        pass_filenames: false
+
+      - id: agents-policy
+        name: AGENTS policy checks
+        entry: ./scripts/agent-policy-check.sh
+        language: system
+        pass_filenames: false
